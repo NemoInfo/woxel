@@ -1,9 +1,10 @@
-use std::{collections::HashMap, default};
+use std::{any::type_name, collections::HashMap};
 
 pub trait Node {
     const LOG2_D: u64;
+    const LOG2_DD: u64 = Self::LOG2_D * 2;
     const TOTAL_LOG2_D: u64;
-    const CHILD_LOG2_D: u64 = Self::TOTAL_LOG2_D - Self::LOG2_D;
+    const CHILD_TOTAL_LOG2_D: u64 = Self::TOTAL_LOG2_D - Self::LOG2_D;
     const DIM: u64 = 1 << Self::LOG2_D;
     // Size of this node (i.e. length of data array)
     const SIZE: usize = 1 << (Self::LOG2_D * 3);
@@ -12,16 +13,16 @@ pub trait Node {
 
     /// Give the bit index for the child node that contains position `p`
     fn bit_index_from_coords(p: [u32; 3]) -> usize {
-        // @TODO: test this better
+        // @SPEED: Maybe don't use iterators
         // Relative coordinates of point to nearest node
         let p = p.map(|c| c & ((1 << Self::TOTAL_LOG2_D) - 1));
         // Relative coordinates of child node
-        let [x, y, z] = p.map(|c| c >> Self::CHILD_LOG2_D);
+        let [x, y, z] = p.map(|c| c >> Self::CHILD_TOTAL_LOG2_D);
         // Actual bit_index
-        (z | (y << Self::LOG2_D) | (x << ((Self::LOG2_D) << 1)))
-            .try_into()
-            .unwrap() // @HACK: do actual error handling
+        (z | (y << Self::LOG2_D) | (x << ((Self::LOG2_D) << 1))) as usize
     }
+
+    fn pretty_print_inner(&self, input: &mut String, offset: usize);
 }
 
 #[derive(Debug)]
@@ -29,6 +30,7 @@ pub struct LeafNode<ValueType, const LOG2_D: u64>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
+    ValueType: std::fmt::Display,
 {
     pub data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize],
     pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
@@ -39,15 +41,35 @@ impl<ValueType, const LOG2_D: u64> Node for LeafNode<ValueType, LOG2_D>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
+    ValueType: std::fmt::Display,
 {
     const LOG2_D: u64 = LOG2_D;
     const TOTAL_LOG2_D: u64 = LOG2_D;
+
+    fn pretty_print_inner(&self, input: &mut String, offset: usize) {
+        let border: String = " ".repeat(offset);
+        *input += &format!("{}{}\n", border, type_name::<Self>(),);
+        *input += &format!("{}data:\n", border);
+        *input += &border.clone();
+        for val in &self.data {
+            match val {
+                LeafData::Offset(_) => {
+                    *input += "o";
+                }
+                LeafData::Value(v) => {
+                    *input += &format!("{}", v);
+                }
+            }
+        }
+        *input += "\n";
+    }
 }
 
 impl<ValueType, const LOG2_D: u64> LeafNode<ValueType, LOG2_D>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
+    ValueType: std::fmt::Display,
 {
     pub fn new() -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
@@ -116,6 +138,28 @@ where
 {
     const LOG2_D: u64 = LOG2_D;
     const TOTAL_LOG2_D: u64 = LOG2_D + ChildType::TOTAL_LOG2_D;
+
+    fn pretty_print_inner(&self, input: &mut String, offset: usize) {
+        let border: String = " ".repeat(offset);
+        *input += &format!(
+            "{}{} {} {}: {}\n",
+            border,
+            self.origin[0],
+            self.origin[1],
+            self.origin[2],
+            type_name::<Self>(),
+        );
+        *input += &format!("{}data:\n", border);
+        for val in &self.data {
+            match val {
+                InternalData::Tile(_) => {}
+                InternalData::Node(child) => {
+                    child.pretty_print_inner(input, offset + 2);
+                }
+            }
+        }
+        *input += "\n";
+    }
 }
 
 #[derive(Debug)]
@@ -145,6 +189,21 @@ where
         let map = HashMap::new();
         let background = ValueType::default();
         Self { map, background }
+    }
+
+    pub fn pretty_print(&self, input: &mut String) {
+        for (key, val) in self.map.iter() {
+            if let RootData::Node(node) = val {
+                *input += &format!(
+                    "{} {} {}: {}\n",
+                    key[0],
+                    key[1],
+                    key[2],
+                    type_name::<ChildType>()
+                );
+                node.pretty_print_inner(input, 2);
+            }
+        }
     }
 }
 
@@ -192,6 +251,15 @@ where
             grid_descriptor,
         }
     }
+}
+
+#[derive(Debug)]
+pub enum VdbEndpoint<ValueType> {
+    Offs(usize),
+    Leaf(ValueType),
+    Innr(ValueType, u8),
+    Root(ValueType),
+    Bkgr(ValueType),
 }
 
 type N3 = LeafNode<u64, 3>;

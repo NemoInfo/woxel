@@ -8,10 +8,9 @@ pub type VDB345<ValueType> = VDB<ValueType, N5<ValueType>>;
 
 impl<'a, ValueType> VDB345<ValueType>
 where
-    ValueType: Default,
+    ValueType: Default + std::fmt::Display,
 {
     pub fn set_voxel(&mut self, p: [u32; 3], v: ValueType) {
-        println!("hello");
         let root_key = self.root.root_key_from_coords(p);
         let bit_index_4 = <N5<ValueType>>::bit_index_from_coords(p);
         let bit_index_3 = <N4<ValueType>>::bit_index_from_coords(p);
@@ -52,17 +51,63 @@ where
             panic!("Unreachable")
         }
     }
+
+    pub fn get_voxel(&self, p: [u32; 3]) -> VdbEndpoint<&ValueType> {
+        let root_key = self.root.root_key_from_coords(p);
+
+        let Some(root_data) = self.root.map.get(&root_key) else { return VdbEndpoint::Bkgr(&self.root.background) };
+        match root_data {
+            RootData::Tile(value, _) => VdbEndpoint::Root(value),
+            RootData::Node(node5) => {
+                let bit_index_4 = <N5<ValueType>>::bit_index_from_coords(p);
+                let node5_data = &node5.data[bit_index_4];
+                match node5_data {
+                    InternalData::Tile(value) => VdbEndpoint::Innr(value, 5),
+                    InternalData::Node(node4) => {
+                        let bit_index_3 = <N4<ValueType>>::bit_index_from_coords(p);
+                        let node4_data = &node4.data[bit_index_3];
+                        match node4_data {
+                            InternalData::Tile(value) => VdbEndpoint::Innr(value, 4),
+                            InternalData::Node(node3) => {
+                                let bit_index_0 = <N3<ValueType>>::bit_index_from_coords(p);
+                                let node3_data = &node3.data[bit_index_0];
+                                match node3_data {
+                                    LeafData::Offset(offset) => VdbEndpoint::Offs(*offset),
+                                    LeafData::Value(value) => VdbEndpoint::Leaf(value),
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::thread;
+
     use super::*;
 
     #[test]
     fn set_voxel_test() {
-        let mut vdb = <VDB345<u8>>::new();
-        dbg!(&vdb);
-        vdb.set_voxel([123, 78, 3], 3);
-        assert!(false);
+        let builder = thread::Builder::new()
+            .name("set_voxel_test".into())
+            .stack_size(80 * 1024 * 1024); // @HACK to increase stack size of this test
+        let handler = builder
+            .spawn(|| {
+                let mut vdb = <VDB345<u8>>::new();
+                let points = [[0, 0, 0], [123, 78, 3], [34, 123, 46], [102, 79, 28]];
+                for (i, &point) in points.iter().enumerate() {
+                    vdb.set_voxel(point, i as u8);
+                }
+                for (i, &point) in points.iter().enumerate() {
+                    let VdbEndpoint::Leaf(&res) = vdb.get_voxel(point) else { panic!("Leaf value not found at point {point:?}"); };
+                    assert_eq!(i as u8, res);
+                }
+            })
+            .unwrap();
+        handler.join().unwrap_or_else(|_| panic!("Test Failed"));
     }
 }
