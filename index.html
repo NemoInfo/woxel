@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Woxel</title>
+    <style>
+      canvas {
+        background-color: black;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="canvas"></div>
+    <script type="module">
+      import init from "./api/wasm.js";
+
+      async function run() {
+        await init("/api/wasm.wasm");
+      }
+
+      const reloadInterval = 1000;
+
+      async function startReloadInterval() {
+        const fetchVersion = () =>
+          fetch("/api/version").then((response) => response.text());
+        const version = await fetchVersion();
+        let intervalToken;
+
+        function reloadIfChanged() {
+          fetchVersion().then((newVersion) => {
+            if (version != newVersion) {
+              window.location.reload();
+            }
+          });
+        }
+
+        intervalToken = setInterval(reloadIfChanged, reloadInterval);
+      }
+
+      run();
+      startReloadInterval();
+    </script>
+
+    <script>
+      document.body.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    </script>
+  </body>
+</html>

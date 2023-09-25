@@ -10,6 +10,7 @@ impl<'a, ValueType> VDB345<ValueType>
 where
     ValueType: Default + std::fmt::Display,
 {
+    /// Sets the value `v` of a single voxel in the VDB at point `p`.
     pub fn set_voxel(&mut self, p: [u32; 3], v: ValueType) {
         let root_key = self.root.root_key_from_coords(p);
         let bit_index_4 = <N5<ValueType>>::bit_index_from_coords(p);
@@ -52,6 +53,7 @@ where
         }
     }
 
+    /// Returns the value of a single voxel in the VDB at point `p`.
     pub fn get_voxel(&self, p: [u32; 3]) -> VdbEndpoint<&ValueType> {
         let root_key = self.root.root_key_from_coords(p);
 
@@ -91,7 +93,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn set_voxel_test() {
+    fn set_get_voxel_test() {
         let builder = thread::Builder::new()
             .name("set_voxel_test".into())
             .stack_size(80 * 1024 * 1024); // @HACK to increase stack size of this test
