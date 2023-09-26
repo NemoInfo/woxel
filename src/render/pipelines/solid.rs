@@ -1,5 +1,7 @@
 use wgpu::{PipelineLayout, RenderPipeline};
 
+use crate::render::gpu_types::{GpuPrimitive, GpuQuad};
+
 use super::Pipeline;
 
 pub struct VoxelPipeline;
@@ -17,7 +19,7 @@ impl Pipeline for VoxelPipeline {
                 vertex: wgpu::VertexState {
                     module: vert_shader,
                     entry_point: "vs_main",
-                    buffers: &[],
+                    buffers: &[GpuQuad::desc()],
                 },
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,

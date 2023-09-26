@@ -13,5 +13,5 @@ struct Input {
 fn vs_main(model: Input) -> @builtin(position) vec4<f32> {
     //out.clip_position = camera.view_proj * world_vert;
 
-    return vec4<f32>(1.0,0.0,0.0,1.0);
+    return vec4<f32>(model.position, 1.0);
 }
