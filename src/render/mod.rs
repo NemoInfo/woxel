@@ -5,7 +5,7 @@ mod shader;
 pub use shader::Shader;
 
 mod camera;
-pub use camera::Camera;
+pub use camera::{Camera, CameraController};
 
 mod frame_descriptor;
 mod gpu_types;

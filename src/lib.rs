@@ -11,9 +11,11 @@ use winit::window::WindowBuilder;
 
 mod render;
 mod runtime;
+mod scene;
 
 use crate::render::WgpuContext;
 use crate::runtime::Runtime;
+use crate::scene::Scene;
 
 const DEFAULT_SIZE: Size = Size::Physical(PhysicalSize::new(1600, 900));
 
@@ -71,7 +73,9 @@ pub async fn run() {
     context.add_shader("solid.vert", include_str!("./shaders/solid.vert.wgsl"));
     context.add_shader("solid.frag", include_str!("./shaders/solid.frag.wgsl"));
 
-    let mut runtime = Runtime::new(context, window);
+    let scene = Scene::new(&context);
+
+    let mut runtime = Runtime::new(context, window, scene);
     event_loop
         .run(move |event, target, control_flow| runtime.main_loop(event, target, control_flow));
 }

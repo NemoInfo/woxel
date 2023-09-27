@@ -1,4 +1,5 @@
 use wgpu::{util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Color, Device};
+use winit::dpi::PhysicalSize;
 
 use crate::render::{
     gpu_types::{CameraUniform, GpuUniform},
@@ -8,14 +9,11 @@ use crate::render::{
 use super::gpu_types::{GpuPrimitive, GpuQuad, RayUniform, GPU_QUAD};
 
 pub struct FrameDescriptor {
-    camera: Camera,
     pub clear_color: Color,
 }
 
 impl FrameDescriptor {
     pub fn build() -> Self {
-        let camera = Camera::quick_camera(1600.0 / 900.0);
-
         let clear_color = wgpu::Color {
             r: 0.0,
             g: 0.0,
@@ -23,17 +21,14 @@ impl FrameDescriptor {
             a: 1.0,
         };
 
-        FrameDescriptor {
-            camera,
-            clear_color,
-        }
+        FrameDescriptor { clear_color }
     }
 
     pub fn create_camera_binding(
-        &self,
+        camera: &Camera,
         device: &Device,
     ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
-        CameraUniform::from(&self.camera).bind(device)
+        CameraUniform::from(camera).bind(device)
     }
 
     pub fn create_vertex_buffer(&self, device: &Device) -> Buffer {
@@ -57,9 +52,10 @@ impl FrameDescriptor {
     }
 
     pub fn create_ray_binding(
-        &self,
+        camera: &Camera,
+        size: PhysicalSize<u32>,
         device: &Device,
     ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
-        RayUniform::build(&self.camera, 1600.0).bind(device)
+        RayUniform::build(&camera, size.width as f32).bind(device)
     }
 }

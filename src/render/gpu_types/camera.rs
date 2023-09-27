@@ -25,13 +25,6 @@ impl GpuUniform for CameraUniform {
 }
 
 impl CameraUniform {
-    fn new() -> Self {
-        Self {
-            view_projection: cgmath::Matrix4::identity().into(),
-            camera_to_world: cgmath::Matrix4::identity().into(),
-        }
-    }
-
     fn get_buffer_contents(&self) -> Vec<u8> {
         bytemuck::cast_slice(&[*self]).to_vec()
     }

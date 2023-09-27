@@ -4,6 +4,8 @@ use log::warn;
 use wgpu::{BindGroup, BindGroupLayout, ShaderModule, Texture};
 use winit::window::Window;
 
+use crate::scene::Scene;
+
 use super::{
     frame_descriptor::FrameDescriptor,
     pipelines::{Pipeline, VoxelPipeline},
@@ -105,7 +107,7 @@ impl WgpuContext {
         }
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, scene: &Scene) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -126,10 +128,10 @@ impl WgpuContext {
         let num_indices = frame_descriptor.indicies().len() as u32;
 
         let (camera_buffer, camera_buffer_contents, camera_bind_group, camera_bind_group_layout) =
-            frame_descriptor.create_camera_binding(&self.device);
+            FrameDescriptor::create_camera_binding(&scene.camera, &self.device);
 
         let (ray_buffer, ray_buffer_contents, ray_bind_group, ray_bind_group_layout) =
-            frame_descriptor.create_ray_binding(&self.device);
+            FrameDescriptor::create_ray_binding(&scene.camera, self.size, &self.device);
 
         let render_pipeline_layout =
             self.device

@@ -4,16 +4,21 @@ use winit::{
     window::Window,
 };
 
-use crate::render::WgpuContext;
+use crate::{render::WgpuContext, scene::Scene};
 
 pub struct Runtime {
     context: WgpuContext,
     window: Window,
+    scene: Scene,
 }
 
 impl Runtime {
-    pub fn new(context: WgpuContext, window: Window) -> Self {
-        Runtime { context, window }
+    pub fn new(context: WgpuContext, window: Window, scene: Scene) -> Self {
+        Runtime {
+            context,
+            window,
+            scene,
+        }
     }
 
     pub fn main_loop<T>(
@@ -26,27 +31,31 @@ impl Runtime {
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == self.window.id() => match event {
-                WindowEvent::CloseRequested
-                | WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            state: ElementState::Pressed,
-                            virtual_keycode: Some(VirtualKeyCode::Escape),
-                            ..
-                        },
-                    ..
-                } => *control_flow = ControlFlow::Exit,
-                WindowEvent::Resized(physical_size) => {
-                    self.context.resize(*physical_size);
+            } if window_id == self.window.id() => {
+                self.scene.input(&event);
+                match event {
+                    WindowEvent::CloseRequested
+                    | WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                state: ElementState::Pressed,
+                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                                ..
+                            },
+                        ..
+                    } => *control_flow = ControlFlow::Exit,
+                    WindowEvent::Resized(physical_size) => {
+                        self.context.resize(*physical_size);
+                    }
+                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                        self.context.resize(**new_inner_size);
+                    }
+                    _ => {}
                 }
-                WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    self.context.resize(**new_inner_size);
-                }
-                _ => {}
-            },
+            }
             Event::RedrawRequested(window_id) if window_id == self.window.id() => {
-                match self.context.render() {
+                self.scene.update(&self.context);
+                match self.context.render(&self.scene) {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
                     Err(wgpu::SurfaceError::Lost) => self.context.resize(self.context.size),
