@@ -5,7 +5,7 @@ use crate::render::{
     Camera,
 };
 
-use super::gpu_types::{GpuPrimitive, GpuQuad, GPU_QUAD};
+use super::gpu_types::{GpuPrimitive, GpuQuad, RayUniform, GPU_QUAD};
 
 pub struct FrameDescriptor {
     camera: Camera,
@@ -54,5 +54,12 @@ impl FrameDescriptor {
             contents: bytemuck::cast_slice(&self.indicies()),
             usage: wgpu::BufferUsages::INDEX,
         })
+    }
+
+    pub fn create_ray_binding(
+        &self,
+        device: &Device,
+    ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
+        RayUniform::build(&self.camera, [1600.0, 900.0]).bind(device)
     }
 }

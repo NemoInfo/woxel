@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tracing::info;
+use log::warn;
 use wgpu::{BindGroup, BindGroupLayout, ShaderModule, Texture};
 use winit::window::Window;
 
@@ -41,8 +41,8 @@ impl WgpuContext {
 
         let backend = format!("{:?}", adapter.get_info().backend);
         let name = format!("{:?}", adapter.get_info().name);
-        println!("Backend: {}", backend);
-        println!("Adaptor: {}", name);
+        warn!("Backend: {}", backend);
+        warn!("Adaptor: {}", name);
 
         let (device, queue) = adapter
             .request_device(
@@ -62,7 +62,7 @@ impl WgpuContext {
             .await
             .unwrap();
 
-        println!("Device: {:?}", &device);
+        warn!("Device: {:?}", &device);
 
         let surface_caps = surface.get_capabilities(&adapter);
         // we want to work with srgb format
@@ -128,28 +128,18 @@ impl WgpuContext {
         let (camera_buffer, camera_buffer_contents, camera_bind_group, camera_bind_group_layout) =
             frame_descriptor.create_camera_binding(&self.device);
 
+        let (ray_buffer, ray_buffer_contents, ray_bind_group, ray_bind_group_layout) =
+            frame_descriptor.create_ray_binding(&self.device);
+
         let render_pipeline_layout =
             self.device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Render Pipeline Layout"),
-                    bind_group_layouts: &[&camera_bind_group_layout],
+                    bind_group_layouts: &[&camera_bind_group_layout, &ray_bind_group_layout],
                     push_constant_ranges: &[],
                 });
 
         let render_pipeline = VoxelPipeline.get(self, render_pipeline_layout);
-
-        // let instance_buffer = frame_descriptor.create_instance_buffer(&self.device);
-
-        // let num_instances = frame_descriptor.instances().len() as u32;
-
-        // let particle_pipeline_layout =
-        //     self.device
-        //         .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        //             label: Some("Solid Pipline Layout"),
-        //             bind_group_layouts: &[&camera_bind_group_layout],
-        //             push_constant_ranges: &[],
-        //         });
-        // let particle_pipeline = ParticlePipeline.get(self, particle_pipeline_layout);
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -166,6 +156,7 @@ impl WgpuContext {
             });
             render_pass.set_pipeline(&render_pipeline);
             render_pass.set_bind_group(0, &camera_bind_group, &[]);
+            render_pass.set_bind_group(1, &ray_bind_group, &[]);
             render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
             render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
@@ -173,6 +164,9 @@ impl WgpuContext {
 
         self.queue
             .write_buffer(&camera_buffer, 0, &camera_buffer_contents);
+
+        self.queue
+            .write_buffer(&ray_buffer, 0, &ray_buffer_contents);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();

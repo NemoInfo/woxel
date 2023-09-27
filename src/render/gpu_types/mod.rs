@@ -17,3 +17,6 @@ pub use vertex::GpuVertex;
 
 mod quad;
 pub use quad::{GpuQuad, GPU_QUAD};
+
+mod ray;
+pub use ray::RayUniform;

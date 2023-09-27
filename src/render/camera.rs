@@ -3,7 +3,8 @@ pub struct Camera {
     target: cgmath::Point3<f32>,
     up: cgmath::Vector3<f32>,
     aspect: f32,
-    fovy: f32,
+    /// y-axis fov in degrees
+    pub fovy: f32,
     znear: f32,
     zfar: f32,
 }
@@ -26,7 +27,8 @@ impl Camera {
             target: (0.0, 0.0, 0.0).into(),
             // which way is "up"
             up: cgmath::Vector3::unit_y(),
-            aspect: aspect,
+            aspect,
+            // In degrees
             fovy: 45.0,
             znear: 0.1,
             zfar: 100.0,

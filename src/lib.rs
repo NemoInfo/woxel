@@ -21,11 +21,10 @@ const DEFAULT_SIZE: Size = Size::Physical(PhysicalSize::new(1600, 900));
 pub async fn run() {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
-            console_error_panic_hook::set_once();
-            tracing_wasm::set_as_global_default();
-        }
-        else {
-            // tracing_subscriber::fmt::init()
+            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+            console_log::init_with_level(log::Level::Warn).expect("Couldn't initialize logger");
+        } else {
+            env_logger::init();
         }
     }
 
