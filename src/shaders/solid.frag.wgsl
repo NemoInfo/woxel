@@ -25,8 +25,6 @@ struct Output {
 fn fs_main(frag: Input) -> @location(0) vec4<f32>
 {
     var p: vec2<f32> = vec2<f32>(frag.position.xy);
-    var ray_dir = normalize(p.x * r.u + p.y * r.mv + r.wp);
-    var valr: f32 = frag.position.x / 1600.0;
-    var valg: f32 = 1.0 - valr;
+    var ray_dir = normalize((p.x * r.u + p.y * r.mv + r.wp).xyz);
     return vec4<f32>(ray_dir.xyz, 1.0);
 }

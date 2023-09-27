@@ -14,7 +14,7 @@ pub struct FrameDescriptor {
 
 impl FrameDescriptor {
     pub fn build() -> Self {
-        let camera = Camera::quick_camera(3.2);
+        let camera = Camera::quick_camera(1600.0 / 900.0);
 
         let clear_color = wgpu::Color {
             r: 0.0,
@@ -60,6 +60,6 @@ impl FrameDescriptor {
         &self,
         device: &Device,
     ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
-        RayUniform::build(&self.camera, [1600.0, 900.0]).bind(device)
+        RayUniform::build(&self.camera, 1600.0).bind(device)
     }
 }

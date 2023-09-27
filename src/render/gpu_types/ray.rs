@@ -73,25 +73,21 @@ impl<'a> RayUniform {
         })
     }
 
-    pub fn build(c: &'a Camera, [width, height]: [f32; 2]) -> Self {
+    pub fn build(c: &'a Camera, resolution_width: f32) -> Self {
         let view_proj = c.build_view_projection_matrix();
         let camera_to_world = match view_proj.invert() {
             Some(c) => c,
             None => panic!("Could not invert camera matrix"),
         };
-        let camera_to_world = view_proj;
         // @TODO: Thorough check this !!! No chance I got it right the first time
-
+        let height = resolution_width / c.aspect;
         let u = camera_to_world.x;
         let v = camera_to_world.y;
         let w = camera_to_world.z;
-        let wp = (-width / 2.0) * u + (height / 2.0) * v
-            - (height / 2.0) / (c.fovy.to_radians() * 0.5).tan() * w;
+        let wp = (-resolution_width / 2.0) * u + (height / 2.0) * v
+            - w * (height / 2.0) / (c.fovy.to_radians() * 0.5).tan();
         let mv = -v;
 
-        dbg!(u);
-        dbg!(mv);
-        dbg!(wp);
         Self {
             u: u.into(),
             mv: mv.into(),
