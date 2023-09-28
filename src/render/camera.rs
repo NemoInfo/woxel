@@ -35,7 +35,7 @@ impl Camera {
     pub fn get_ray_dir(
         &self,
         _point @ [x, y]: [f32; 2],
-        [resolution_width, _resolution_height]: [f32; 2],
+        _resoltion @ [width, _height]: [f32; 2],
     ) -> Vector3<f32> {
         let view_proj = self.build_view_projection_matrix();
         let camera_to_world = match view_proj.invert() {
@@ -43,11 +43,11 @@ impl Camera {
             None => panic!("Could not invert camera matrix"),
         };
         // @TODO: Thorough check this !!! No chance I got it right the first time
-        let height = resolution_width / self.aspect;
+        let height = width / self.aspect;
         let u = camera_to_world.x;
         let v = camera_to_world.y;
         let w = camera_to_world.z;
-        let wp = (-resolution_width / 2.0) * u + (height / 2.0) * v
+        let wp = (-width / 2.0) * u + (height / 2.0) * v
             - w * (height / 2.0) / (self.fovy.to_radians() * 0.5).tan();
         let mv = -v;
 
@@ -64,9 +64,11 @@ pub struct CameraController {
     is_mouse_pressed: bool,
     is_up_pressed: bool,
     is_down_pressed: bool,
-    pub prev_cursor: [f32; 2],
-    pub curr_cursor: [f32; 2],
+    prev_cursor: [f32; 2],
+    curr_cursor: [f32; 2],
 }
+
+const CAMERA_MIN_Y_ANGLE: f32 = 20.0;
 
 impl CameraController {
     pub fn new(speed: f32) -> Self {
@@ -189,9 +191,19 @@ impl CameraController {
             // @HACK: Remove hardcoded camera sensitiviy
             let d = -diff * 2.3;
 
+            let (target, eye) = (camera.target, camera.eye);
             camera.target = camera.eye
                 + (camera.target + d - camera.eye).normalize()
                     * (camera.target - camera.eye).magnitude();
+
+            let y = Vector3::new(0.0f32, 1.0, 0.0);
+            let v = camera.target - camera.eye;
+            let alpha = y.angle(v).0.to_degrees();
+            let beta = (-y).angle(v).0.to_degrees();
+            if alpha < CAMERA_MIN_Y_ANGLE || beta < CAMERA_MIN_Y_ANGLE {
+                // @TODO: allow to move to be just on the edge of max rotation
+                (camera.target, camera.eye) = (target, eye);
+            }
         }
 
         self.prev_cursor = self.curr_cursor;

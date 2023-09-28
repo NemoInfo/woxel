@@ -1,5 +1,5 @@
 use bytemuck_derive::{Pod, Zeroable};
-use cgmath::{Matrix, SquareMatrix};
+use cgmath::SquareMatrix;
 use wgpu::{util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Device};
 
 use crate::render::Camera;

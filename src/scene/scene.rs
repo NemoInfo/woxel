@@ -11,25 +11,28 @@ pub struct Scene {
     // pub voxels: VDB
 }
 
+const CAMERA_SPEED: f32 = 0.2;
+
 impl Scene {
     pub fn new(context: &WgpuContext) -> Self {
-        let aspect = context.config.width as f32 / context.config.height as f32;
-        let camera_controller = CameraController::new(0.2);
+        let resolution = [context.config.width as f32, context.config.height as f32];
+        let aspect = resolution[0] / resolution[1];
+        let camera_controller = CameraController::new(CAMERA_SPEED);
         Self {
-            state: State {},
+            state: State::new(resolution),
             camera: Camera::quick_camera(aspect),
             camera_controller,
         }
     }
 
-    pub fn update(&mut self, context: &WgpuContext) {
-        self.camera_controller.update_camera(
-            &mut self.camera,
-            [context.config.width as f32, context.config.height as f32],
-        );
+    pub fn update(&mut self) {
+        self.camera_controller
+            .update_camera(&mut self.camera, self.state.resolution);
+        self.state.update();
     }
 
     pub fn input(&mut self, event: &WindowEvent) {
         self.camera_controller.process_events(event);
+        self.state.process_events(event);
     }
 }

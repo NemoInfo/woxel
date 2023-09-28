@@ -46,15 +46,17 @@ impl Runtime {
                     } => *control_flow = ControlFlow::Exit,
                     WindowEvent::Resized(physical_size) => {
                         self.context.resize(*physical_size);
+                        self.scene.state.resolution = (*physical_size).into();
                     }
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                         self.context.resize(**new_inner_size);
+                        self.scene.state.resolution = self.context.size.into();
                     }
                     _ => {}
                 }
             }
             Event::RedrawRequested(window_id) if window_id == self.window.id() => {
-                self.scene.update(&self.context);
+                self.scene.update();
                 match self.context.render(&self.scene) {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
