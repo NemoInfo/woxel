@@ -11,6 +11,7 @@ pub struct CameraUniform {
     // to convert the Matrix4 into a 4x4 f32 array
     view_projection: [[f32; 4]; 4],
     camera_to_world: [[f32; 4]; 4],
+    eye: [f32; 4],
 }
 
 impl GpuUniform for CameraUniform {
@@ -79,10 +80,12 @@ impl<'a> From<&'a Camera> for CameraUniform {
         })
         .into();
         let view_projection = view_projection.into();
+        let eye = [c.eye.x, c.eye.y, c.eye.z, 0.0];
 
         Self {
             view_projection,
             camera_to_world,
+            eye,
         }
     }
 }

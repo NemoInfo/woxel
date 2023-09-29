@@ -11,7 +11,7 @@ pub struct Scene {
     // pub voxels: VDB
 }
 
-const CAMERA_SPEED: f32 = 0.2;
+const CAMERA_SPEED: f32 = 0.1;
 
 impl Scene {
     pub fn new(context: &WgpuContext) -> Self {
