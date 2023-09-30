@@ -1,18 +1,7 @@
-struct CameraUniform {
-    view_proj: mat4x4<f32>,
-    camera_to_world: mat4x4<f32>,
-    eye: vec3<f32>,
-};
 @group(0) @binding(0)
-var<uniform> camera: CameraUniform;
-
-struct RayUniform {
-    u: vec4<f32>,
-    mv: vec4<f32>,
-    wp: vec4<f32>,
-};
-@group(1) @binding(0)
-var<uniform> r: RayUniform;
+var texture: texture_2d<f32>;
+@group(0) @binding(1)
+var tsampler: sampler;
 
 struct Input {
     @builtin(position) position: vec4<f32>,
@@ -25,50 +14,8 @@ struct Output {
 @fragment
 fn fs_main(frag: Input) -> @location(0) vec4<f32>
 {
-    var p: vec2<f32> = vec2<f32>(frag.position.xy);
-    var ray_dir = normalize((p.x * r.u + p.y * r.mv + r.wp).xyz);
-    var ray_src = camera.eye;
-    var color = cast_ray(ray_src, ray_dir);
-    return vec4<f32>(color, 1.0);
-}
+    var p = vec2<f32>(frag.position.xy) / vec2(1600.0, 900.0);
+    var color = textureSample(texture, tsampler, p);
 
-const MAX_RAY_STEPS: i32 = 64;
-fn cast_ray(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    var ipos = vec3<i32>(floor(src));
-    var deltaDist = abs(vec3<f32>(length(dir)) / dir);
-    var step = vec3<i32>(sign(dir));
-    var sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5) + 0.5) * deltaDist;
-    var mask = vec3<bool>(false);
-    var i: i32 = 0;
-
-    for (i = 0; i < MAX_RAY_STEPS; i++) {
-        if (getVoxel(ipos)) {
-            break;
-        }
-
-        var b1 = sideDist.xyz <= sideDist.yzx;
-        var b2 = sideDist.xyz <= sideDist.zxy;
-        mask = b1 & b2;
-
-        sideDist += vec3<f32>(mask) * deltaDist;
-        ipos += vec3<i32>(mask) * step;
-    }
-
-    if (i == MAX_RAY_STEPS) {
-        return vec3<f32>(dir);
-    }
-    if (mask.x) {
-        return vec3<f32>(0.5);
-    }
-    if (mask.y) {
-        return vec3<f32>(1.0);
-    }
-    if (mask.z) {
-        return vec3<f32>(0.75);
-    }
-    return vec3<f32>(0.0);
-}
-
-fn getVoxel(pos: vec3<i32>) -> bool{
-    return pos.x == 5 && pos.y == 0 && pos.z == 5;
+    return color;
 }

@@ -1,4 +1,9 @@
-use wgpu::{util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Color, Device};
+use std::num::NonZeroU32;
+
+use wgpu::{
+    util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Color, Device, Sampler, Texture,
+    TextureView,
+};
 use winit::dpi::PhysicalSize;
 
 use crate::render::{
@@ -57,5 +62,60 @@ impl FrameDescriptor {
         device: &Device,
     ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
         RayUniform::build(&camera, size.width as f32).bind(device)
+    }
+
+    pub fn create_output_texture_binding(
+        device: &Device,
+    ) -> (Texture, TextureView, BindGroup, BindGroupLayout) {
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: 1600,
+                height: 900,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::STORAGE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::COPY_SRC,
+            label: Some("Compute Texture"),
+            view_formats: &[],
+        });
+
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Compute Texture Output"),
+            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            base_mip_level: 0,
+            mip_level_count: Some(1),
+            ..Default::default()
+        });
+
+        let bind_group_layput = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Compute Texture Bind Group Layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::COMPUTE | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::StorageTexture {
+                    access: wgpu::StorageTextureAccess::WriteOnly,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                },
+                count: None,
+            }],
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Compute Texture Bind Group"),
+            layout: &bind_group_layput,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&texture_view),
+            }],
+        });
+
+        (texture, texture_view, bind_group, bind_group_layput)
     }
 }

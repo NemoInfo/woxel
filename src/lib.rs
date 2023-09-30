@@ -72,6 +72,7 @@ pub async fn run() {
 
     context.add_shader("solid.vert", include_str!("./shaders/solid.vert.wgsl"));
     context.add_shader("solid.frag", include_str!("./shaders/solid.frag.wgsl"));
+    context.add_shader("raycast.comp", include_str!("./shaders/raycast.comp.wgsl"));
 
     let scene = Scene::new(&context);
 

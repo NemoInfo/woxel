@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use log::warn;
-use wgpu::{BindGroup, BindGroupLayout, ShaderModule, Texture};
+use wgpu::{BindGroup, BindGroupLayout, ComputePipeline, ShaderModule, Texture};
 use winit::window::Window;
 
 use crate::scene::Scene;
 
 use super::{
     frame_descriptor::FrameDescriptor,
-    pipelines::{Pipeline, VoxelPipeline},
+    pipelines::{CPipeline, ComputePipeline, Pipeline, VoxelPipeline},
 };
 
 pub struct WgpuContext {
@@ -133,15 +133,122 @@ impl WgpuContext {
         let (ray_buffer, ray_buffer_contents, ray_bind_group, ray_bind_group_layout) =
             FrameDescriptor::create_ray_binding(&scene.camera, self.size, &self.device);
 
+        let (texture, texture_view, texture_bind_group, texture_bind_group_layout) =
+            FrameDescriptor::create_output_texture_binding(&self.device);
+
+        let compute_pipline_layout =
+            self.device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Compute Pipline Layout"),
+                    bind_group_layouts: &[
+                        &camera_bind_group_layout,
+                        &ray_bind_group_layout,
+                        &texture_bind_group_layout,
+                    ],
+                    push_constant_ranges: &[],
+                });
+
+        let fragment_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: 1600,
+                height: 900,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            label: Some("Fragment Texture"),
+            view_formats: &[],
+        });
+
+        let fragment_texture_view = fragment_texture.create_view(&wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
+
+        let fragment_texture_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let fragment_texture_bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Fragment Texture Bind Group Layout"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                            count: None,
+                        },
+                    ],
+                });
+
+        let fragment_texture_bind_group =
+            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Fragment Texture Bind Group"),
+                layout: &fragment_texture_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&fragment_texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&fragment_texture_sampler),
+                    },
+                ],
+            });
+
         let render_pipeline_layout =
             self.device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Render Pipeline Layout"),
-                    bind_group_layouts: &[&camera_bind_group_layout, &ray_bind_group_layout],
+                    bind_group_layouts: &[&fragment_texture_bind_group_layout],
                     push_constant_ranges: &[],
                 });
 
+        let compute_pipeline = ComputePipeline.get(self, compute_pipline_layout);
         let render_pipeline = VoxelPipeline.get(self, render_pipeline_layout);
+
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Compute Pass"),
+            });
+
+            compute_pass.set_pipeline(&compute_pipeline);
+            compute_pass.set_bind_group(0, &camera_bind_group, &[]);
+            compute_pass.set_bind_group(1, &ray_bind_group, &[]);
+            compute_pass.set_bind_group(2, &texture_bind_group, &[]);
+            compute_pass.dispatch_workgroups(1600, 900, 1);
+        }
+
+        encoder.copy_texture_to_texture(
+            texture.as_image_copy(),
+            fragment_texture.as_image_copy(),
+            wgpu::Extent3d {
+                width: 1600,
+                height: 900,
+                depth_or_array_layers: 1,
+            },
+        );
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -157,8 +264,7 @@ impl WgpuContext {
                 depth_stencil_attachment: None,
             });
             render_pass.set_pipeline(&render_pipeline);
-            render_pass.set_bind_group(0, &camera_bind_group, &[]);
-            render_pass.set_bind_group(1, &ray_bind_group, &[]);
+            render_pass.set_bind_group(0, &fragment_texture_bind_group, &[]);
             render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
             render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
