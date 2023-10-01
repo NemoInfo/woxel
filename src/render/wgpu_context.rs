@@ -130,11 +130,17 @@ impl WgpuContext {
         let (camera_buffer, camera_buffer_contents, camera_bind_group, camera_bind_group_layout) =
             FrameDescriptor::create_camera_binding(&scene.camera, &self.device);
 
+        let (state_buffer, state_buffer_contents, state_bind_group, state_bind_group_layout) =
+            FrameDescriptor::create_screen_state_binding(&self.device, &scene.state);
+
         let (ray_buffer, ray_buffer_contents, ray_bind_group, ray_bind_group_layout) =
             FrameDescriptor::create_ray_binding(&scene.camera, self.size, &self.device);
 
-        let (texture, texture_view, texture_bind_group, texture_bind_group_layout) =
-            FrameDescriptor::create_output_texture_binding(&self.device);
+        let (compute_texture, compute_texture_bind_group, compute_texture_bind_group_layout) =
+            FrameDescriptor::create_compute_output_texture_binding(&self.device, self.size.into());
+
+        let (fragment_texture, fragment_texture_bind_group, fragment_texture_bind_group_layout) =
+            FrameDescriptor::create_fragment_texture_binding(&self.device, self.size.into());
 
         let compute_pipline_layout =
             self.device
@@ -143,85 +149,18 @@ impl WgpuContext {
                     bind_group_layouts: &[
                         &camera_bind_group_layout,
                         &ray_bind_group_layout,
-                        &texture_bind_group_layout,
+                        &compute_texture_bind_group_layout,
                     ],
                     push_constant_ranges: &[],
                 });
-
-        let fragment_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width: 1600,
-                height: 900,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("Fragment Texture"),
-            view_formats: &[],
-        });
-
-        let fragment_texture_view = fragment_texture.create_view(&wgpu::TextureViewDescriptor {
-            ..Default::default()
-        });
-
-        let fragment_texture_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
-        let fragment_texture_bind_group_layout =
-            self.device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("Fragment Texture Bind Group Layout"),
-                    entries: &[
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Texture {
-                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                                multisampled: false,
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                            count: None,
-                        },
-                    ],
-                });
-
-        let fragment_texture_bind_group =
-            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Fragment Texture Bind Group"),
-                layout: &fragment_texture_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&fragment_texture_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&fragment_texture_sampler),
-                    },
-                ],
-            });
-
         let render_pipeline_layout =
             self.device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Render Pipeline Layout"),
-                    bind_group_layouts: &[&fragment_texture_bind_group_layout],
+                    bind_group_layouts: &[
+                        &fragment_texture_bind_group_layout,
+                        &state_bind_group_layout,
+                    ],
                     push_constant_ranges: &[],
                 });
 
@@ -236,16 +175,17 @@ impl WgpuContext {
             compute_pass.set_pipeline(&compute_pipeline);
             compute_pass.set_bind_group(0, &camera_bind_group, &[]);
             compute_pass.set_bind_group(1, &ray_bind_group, &[]);
-            compute_pass.set_bind_group(2, &texture_bind_group, &[]);
-            compute_pass.dispatch_workgroups(1600, 900, 1);
+            compute_pass.set_bind_group(2, &compute_texture_bind_group, &[]);
+            // @TODO: CHOOSE WORKGROUPS BASED ON ADAPTOR (32 for NVDIA, 64 for AMD)
+            compute_pass.dispatch_workgroups(self.size.width / 8, self.size.height / 4, 1);
         }
 
         encoder.copy_texture_to_texture(
-            texture.as_image_copy(),
+            compute_texture.as_image_copy(),
             fragment_texture.as_image_copy(),
             wgpu::Extent3d {
-                width: 1600,
-                height: 900,
+                width: self.size.width,
+                height: self.size.height,
                 depth_or_array_layers: 1,
             },
         );
@@ -265,10 +205,14 @@ impl WgpuContext {
             });
             render_pass.set_pipeline(&render_pipeline);
             render_pass.set_bind_group(0, &fragment_texture_bind_group, &[]);
+            render_pass.set_bind_group(1, &state_bind_group, &[]);
             render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
             render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
+
+        self.queue
+            .write_buffer(&state_buffer, 0, &state_buffer_contents);
 
         self.queue
             .write_buffer(&camera_buffer, 0, &camera_buffer_contents);

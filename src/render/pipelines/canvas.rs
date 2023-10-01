@@ -8,8 +8,8 @@ pub struct VoxelPipeline;
 
 impl Pipeline for VoxelPipeline {
     fn get(&self, context: &crate::render::WgpuContext, layout: PipelineLayout) -> RenderPipeline {
-        let vert_shader = context.get_shader("solid.vert");
-        let frag_shader = context.get_shader("solid.frag");
+        let vert_shader = context.get_shader("canvas.vert");
+        let frag_shader = context.get_shader("canvas.frag");
 
         let pipeline = context
             .device

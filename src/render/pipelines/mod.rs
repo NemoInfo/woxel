@@ -2,8 +2,8 @@ use wgpu::{ComputePipeline, PipelineLayout, RenderPipeline};
 
 use super::WgpuContext;
 
-mod solid;
-pub use solid::*;
+mod canvas;
+pub use canvas::*;
 
 mod compute;
 pub use compute::*;

@@ -1,21 +1,18 @@
-use crate::render::{gpu_types::GpuUniform, Camera};
 use bytemuck_derive::{Pod, Zeroable};
-use cgmath::SquareMatrix;
 use wgpu::{util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Device};
 
+use crate::scene::State;
+
+use super::GpuUniform;
+
 #[repr(C)]
-// This is so we can store this in a buffer
-#[derive(Debug, Copy, Clone, Pod, Zeroable)]
-pub struct CameraUniform {
-    // We can't use cgmath with bytemuck directly so we'll have
-    // to convert the Matrix4 into a 4x4 f32 array
-    view_projection: [[f32; 4]; 4],
-    camera_to_world: [[f32; 4]; 4],
-    eye: [f32; 4],
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+pub struct StateUniform {
+    pub screen_size: [f32; 4],
 }
 
-impl GpuUniform for CameraUniform {
-    fn bind(&self, device: &Device) -> (Buffer, Vec<u8>, wgpu::BindGroup, BindGroupLayout) {
+impl GpuUniform for StateUniform {
+    fn bind(&self, device: &Device) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
         let buffer_contents = self.get_buffer_contents();
         let buffer = self.create_buffer(device, &buffer_contents);
         let layout = self.create_bind_group_layout(device);
@@ -25,14 +22,14 @@ impl GpuUniform for CameraUniform {
     }
 }
 
-impl CameraUniform {
+impl StateUniform {
     fn get_buffer_contents(&self) -> Vec<u8> {
         bytemuck::cast_slice(&[*self]).to_vec()
     }
 
     fn create_buffer(&self, device: &Device, buffer_contents: &[u8]) -> Buffer {
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
+            label: Some("Screen State Buffer"),
             contents: buffer_contents,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         })
@@ -42,7 +39,7 @@ impl CameraUniform {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::COMPUTE,
+                visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -50,7 +47,7 @@ impl CameraUniform {
                 },
                 count: None,
             }],
-            label: Some("Camera Bind Group Layout"),
+            label: Some("Screen State Bind Group Layout"),
         })
     }
 
@@ -66,26 +63,16 @@ impl CameraUniform {
                 binding: 0,
                 resource: buffer.as_entire_binding(),
             }],
-            label: Some("Camera Bind Group"),
+            label: Some("Screen State Bind Group"),
         })
     }
 }
 
-impl<'a> From<&'a Camera> for CameraUniform {
-    fn from(c: &'a Camera) -> Self {
-        let view_projection = c.build_view_projection_matrix();
-        let camera_to_world = (match view_projection.invert() {
-            Some(c) => c,
-            None => panic!("Could not invert camera matrix"),
-        })
-        .into();
-        let view_projection = view_projection.into();
-        let eye = [c.eye.x, c.eye.y, c.eye.z, 0.0];
-
+impl<'a> From<&'a State> for StateUniform {
+    fn from(state: &'a State) -> Self {
+        let [width, height]: [f32; 2] = state.resolution;
         Self {
-            view_projection,
-            camera_to_world,
-            eye,
+            screen_size: [width, height, 0.0, 0.0],
         }
     }
 }

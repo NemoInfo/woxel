@@ -70,8 +70,8 @@ pub async fn run() {
 
     let mut context = WgpuContext::new(&window).await;
 
-    context.add_shader("solid.vert", include_str!("./shaders/solid.vert.wgsl"));
-    context.add_shader("solid.frag", include_str!("./shaders/solid.frag.wgsl"));
+    context.add_shader("canvas.vert", include_str!("./shaders/canvas.vert.wgsl"));
+    context.add_shader("canvas.frag", include_str!("./shaders/canvas.frag.wgsl"));
     context.add_shader("raycast.comp", include_str!("./shaders/raycast.comp.wgsl"));
 
     let scene = Scene::new(&context);

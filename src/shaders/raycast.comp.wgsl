@@ -17,9 +17,9 @@ var<uniform> r: RayUniform;
 @group(2) @binding(0)
 var texture: texture_storage_2d<rgba8unorm, write>;
 
-@compute @workgroup_size(1,1,1)
+@compute @workgroup_size(8,4)
 fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
-    var p = vec2<f32>(global_id.xy);
+    var p = vec2<f32>(global_id.xy) + vec2(0.01);
     var ray_dir = normalize((p.x * r.u + p.y * r.mv + r.wp).xyz);
     var color = vec4(cast_ray(camera.eye, ray_dir),1.0);
     textureStore(texture, global_id.xy, color);
@@ -62,5 +62,5 @@ fn cast_ray(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 }
 
 fn getVoxel(pos: vec3<i32>) -> bool{
-    return ( pos.x == 5 && pos.y == 0 && pos.z == 5 ) || ( pos.x == 2 && pos.y == 0 && pos.z == 2 ) || ( pos.x == 3 && pos.y == 0 && pos.z == 3 );
+    return ( ( pos.x == pos.z || pos.x == -pos.z ) && pos.y == 0 && (pos.x == 4 || pos.x == 2 || pos.x == 6));
 }

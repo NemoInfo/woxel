@@ -1,17 +1,18 @@
-use std::num::NonZeroU32;
-
-use wgpu::{
-    util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Color, Device, Sampler, Texture,
-    TextureView,
-};
+use wgpu::{util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Color, Device, Texture};
 use winit::dpi::PhysicalSize;
 
-use crate::render::{
-    gpu_types::{CameraUniform, GpuUniform},
-    Camera,
+use crate::{
+    render::{
+        gpu_types::{CameraUniform, GpuUniform},
+        Camera,
+    },
+    scene::State,
 };
 
-use super::gpu_types::{GpuPrimitive, GpuQuad, RayUniform, GPU_QUAD};
+use super::gpu_types::{
+    ComputeOutputTexture, FragmentTexture, GpuPrimitive, GpuQuad, GpuTexture, RayUniform,
+    StateUniform, GPU_QUAD,
+};
 
 pub struct FrameDescriptor {
     pub clear_color: Color,
@@ -25,8 +26,14 @@ impl FrameDescriptor {
             b: 0.0,
             a: 1.0,
         };
-
         FrameDescriptor { clear_color }
+    }
+
+    pub fn create_screen_state_binding(
+        device: &Device,
+        state: &State,
+    ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
+        StateUniform::from(state).bind(&device)
     }
 
     pub fn create_camera_binding(
@@ -64,58 +71,17 @@ impl FrameDescriptor {
         RayUniform::build(&camera, size.width as f32).bind(device)
     }
 
-    pub fn create_output_texture_binding(
+    pub fn create_compute_output_texture_binding(
         device: &Device,
-    ) -> (Texture, TextureView, BindGroup, BindGroupLayout) {
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width: 1600,
-                height: 900,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::STORAGE_BINDING
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::COPY_SRC,
-            label: Some("Compute Texture"),
-            view_formats: &[],
-        });
+        size: [u32; 2],
+    ) -> (Texture, BindGroup, BindGroupLayout) {
+        ComputeOutputTexture::new(size).bind(device)
+    }
 
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("Compute Texture Output"),
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
-            base_mip_level: 0,
-            mip_level_count: Some(1),
-            ..Default::default()
-        });
-
-        let bind_group_layput = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Compute Texture Bind Group Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::COMPUTE | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::StorageTexture {
-                    access: wgpu::StorageTextureAccess::WriteOnly,
-                    format: wgpu::TextureFormat::Rgba8Unorm,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                },
-                count: None,
-            }],
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Compute Texture Bind Group"),
-            layout: &bind_group_layput,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&texture_view),
-            }],
-        });
-
-        (texture, texture_view, bind_group, bind_group_layput)
+    pub fn create_fragment_texture_binding(
+        device: &Device,
+        size: [u32; 2],
+    ) -> (Texture, BindGroup, BindGroupLayout) {
+        FragmentTexture::new(size).bind(device)
     }
 }
