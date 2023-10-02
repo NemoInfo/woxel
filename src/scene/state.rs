@@ -1,3 +1,6 @@
+use std::io::{stdout, Write};
+
+use log::warn;
 use winit::event::WindowEvent;
 
 pub struct State {
@@ -6,6 +9,8 @@ pub struct State {
     pub curr_cursor: [f32; 2],
     pub cursor_jumped: Option<[f32; 2]>,
     pub time_last_frame: instant::Instant,
+    pub initial_time: instant::Instant,
+    pub total_time_elapsed_frame: u64,
 }
 
 impl State {
@@ -16,6 +21,8 @@ impl State {
             curr_cursor: [0.0; 2],
             cursor_jumped: None,
             time_last_frame: instant::Instant::now(),
+            initial_time: instant::Instant::now(),
+            total_time_elapsed_frame: 0,
         }
     }
 
@@ -32,9 +39,21 @@ impl State {
     }
 
     pub fn update(&mut self) {
+        // @TODO: Add web compatibility
+        let total_time_elapsed = self.initial_time.elapsed().as_secs();
+        if total_time_elapsed != self.total_time_elapsed_frame {
+            let mut stdout = stdout();
+            let elapsed = self.time_last_frame.elapsed().as_secs_f64();
+            print!("\rFPS: {:.0}", 1. / elapsed);
+            stdout
+                .flush()
+                .unwrap_or_else(|_| warn!("Could not flush stdout"));
+        }
+
         self.prev_cursor = self.curr_cursor;
         self.check_jumped();
         self.time_last_frame = instant::Instant::now();
+        self.total_time_elapsed_frame = self.initial_time.elapsed().as_secs();
     }
 
     pub fn check_jumped(&mut self) {

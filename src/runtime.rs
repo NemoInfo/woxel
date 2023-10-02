@@ -109,8 +109,6 @@ impl Runtime {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == self.window.id() => {
-                let elapsed = self.scene.state.time_last_frame.elapsed().as_secs_f64();
-                println!("FPS: {:.0}", 1. / elapsed);
                 self.scene.update();
                 match self.context.render(&self.scene) {
                     Ok(_) => {}
