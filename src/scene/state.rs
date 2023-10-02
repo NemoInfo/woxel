@@ -10,7 +10,9 @@ pub struct State {
     pub cursor_jumped: Option<[f32; 2]>,
     pub time_last_frame: instant::Instant,
     pub initial_time: instant::Instant,
-    pub total_time_elapsed_frame: u64,
+    pub total_time_elapsed: u64,
+    pub fps: f32,
+    pub dt: f32,
 }
 
 impl State {
@@ -22,7 +24,9 @@ impl State {
             cursor_jumped: None,
             time_last_frame: instant::Instant::now(),
             initial_time: instant::Instant::now(),
-            total_time_elapsed_frame: 0,
+            total_time_elapsed: 0,
+            fps: 0.,
+            dt: 0.,
         }
     }
 
@@ -41,10 +45,11 @@ impl State {
     pub fn update(&mut self) {
         // @TODO: Add web compatibility
         let total_time_elapsed = self.initial_time.elapsed().as_secs();
-        if total_time_elapsed != self.total_time_elapsed_frame {
+        self.dt = self.time_last_frame.elapsed().as_secs_f32();
+        self.fps = 1. / self.dt;
+        if total_time_elapsed != self.total_time_elapsed {
             let mut stdout = stdout();
-            let elapsed = self.time_last_frame.elapsed().as_secs_f64();
-            print!("\rFPS: {:.0}", 1. / elapsed);
+            print!("\rFPS: {:.0}", self.fps);
             stdout
                 .flush()
                 .unwrap_or_else(|_| warn!("Could not flush stdout"));
@@ -53,7 +58,7 @@ impl State {
         self.prev_cursor = self.curr_cursor;
         self.check_jumped();
         self.time_last_frame = instant::Instant::now();
-        self.total_time_elapsed_frame = self.initial_time.elapsed().as_secs();
+        self.total_time_elapsed = self.initial_time.elapsed().as_secs();
     }
 
     pub fn check_jumped(&mut self) {

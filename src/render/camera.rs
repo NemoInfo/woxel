@@ -1,6 +1,8 @@
 use cgmath::{InnerSpace, SquareMatrix, Vector3};
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 
+use crate::scene::State;
+
 pub struct Camera {
     pub eye: cgmath::Point3<f32>,
     pub target: cgmath::Point3<f32>,
@@ -66,12 +68,13 @@ pub struct CameraController {
 }
 
 const CAMERA_MIN_Y_ANGLE: f32 = 20.0;
-const CAMERA_MOUSE_SENSITIVITY: f32 = 2.3;
+const CAMERA_MOUSE_SENSITIVITY: f32 = 2.3 * 60.;
+const CAMERA_SPEED: f32 = 0.1 * 60.;
 
 impl CameraController {
-    pub fn new(speed: f32) -> Self {
+    pub fn new() -> Self {
         Self {
-            speed,
+            speed: CAMERA_SPEED,
             is_forward_pressed: false,
             is_backward_pressed: false,
             is_left_pressed: false,
@@ -125,59 +128,53 @@ impl CameraController {
         }
     }
 
-    pub fn update_camera(
-        &mut self,
-        camera: &mut Camera,
-        resolution: [f32; 2],
-        prev_cursor: [f32; 2],
-        curr_cursor: [f32; 2],
-    ) {
+    pub fn update_camera(&mut self, camera: &mut Camera, state: &State) {
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
 
         // MOVEMENT
 
         if self.is_forward_pressed {
-            camera.eye += forward_norm * self.speed;
-            camera.target += forward_norm * self.speed;
+            camera.eye += forward_norm * self.speed * state.dt;
+            camera.target += forward_norm * self.speed * state.dt;
         }
         if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
-            camera.target -= forward_norm * self.speed;
+            camera.eye -= forward_norm * self.speed * state.dt;
+            camera.target -= forward_norm * self.speed * state.dt;
         }
 
         let right = forward_norm.cross(camera.up).normalize();
 
         if self.is_right_pressed {
-            camera.eye += right * self.speed;
-            camera.target += right * self.speed;
+            camera.eye += right * self.speed * state.dt;
+            camera.target += right * self.speed * state.dt;
         }
         if self.is_left_pressed {
-            camera.eye -= right * self.speed;
-            camera.target -= right * self.speed;
+            camera.eye -= right * self.speed * state.dt;
+            camera.target -= right * self.speed * state.dt;
         }
 
         let up = camera.up.normalize();
         if self.is_up_pressed {
-            camera.eye += up * self.speed;
-            camera.target += up * self.speed;
+            camera.eye += up * self.speed * state.dt;
+            camera.target += up * self.speed * state.dt;
         }
         if self.is_down_pressed {
-            camera.eye -= up * self.speed;
-            camera.target -= up * self.speed;
+            camera.eye -= up * self.speed * state.dt;
+            camera.target -= up * self.speed * state.dt;
         }
 
         // ROTATION
 
-        if prev_cursor == curr_cursor {
+        if state.prev_cursor == state.curr_cursor {
             return;
         }
-        let ray_prev = camera.get_ray_dir(prev_cursor, resolution);
-        let ray_curr = camera.get_ray_dir(curr_cursor, resolution);
+        let ray_prev = camera.get_ray_dir(state.prev_cursor, state.resolution);
+        let ray_curr = camera.get_ray_dir(state.curr_cursor, state.resolution);
         let diff = ray_curr - ray_prev;
         // @TODO: to make the camera smoother maybe interpolate between the diff's in a set of frames
         //        and compute the rotation direction that way
-        let d = diff * CAMERA_MOUSE_SENSITIVITY;
+        let d = diff * CAMERA_MOUSE_SENSITIVITY * state.dt;
 
         let (target, eye) = (camera.target, camera.eye);
         camera.target = camera.eye

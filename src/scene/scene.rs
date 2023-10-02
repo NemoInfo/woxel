@@ -11,13 +11,11 @@ pub struct Scene {
     // pub voxels: VDB
 }
 
-const CAMERA_SPEED: f32 = 0.1;
-
 impl Scene {
     pub fn new(context: &WgpuContext) -> Self {
         let resolution = [context.config.width as f32, context.config.height as f32];
         let aspect = resolution[0] / resolution[1];
-        let camera_controller = CameraController::new(CAMERA_SPEED);
+        let camera_controller = CameraController::new();
         Self {
             state: State::new(resolution),
             camera: Camera::quick_camera(aspect),
@@ -26,12 +24,8 @@ impl Scene {
     }
 
     pub fn update(&mut self) {
-        self.camera_controller.update_camera(
-            &mut self.camera,
-            self.state.resolution,
-            self.state.prev_cursor,
-            self.state.curr_cursor,
-        );
+        self.camera_controller
+            .update_camera(&mut self.camera, &self.state);
         self.state.update();
     }
 
