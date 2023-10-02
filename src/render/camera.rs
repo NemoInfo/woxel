@@ -1,5 +1,5 @@
 use cgmath::{InnerSpace, SquareMatrix, Vector3};
-use winit::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent};
+use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 pub struct Camera {
     pub eye: cgmath::Point3<f32>,
@@ -61,14 +61,12 @@ pub struct CameraController {
     is_backward_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
-    is_mouse_pressed: bool,
     is_up_pressed: bool,
     is_down_pressed: bool,
-    prev_cursor: [f32; 2],
-    curr_cursor: [f32; 2],
 }
 
 const CAMERA_MIN_Y_ANGLE: f32 = 20.0;
+const CAMERA_MOUSE_SENSITIVITY: f32 = 2.3;
 
 impl CameraController {
     pub fn new(speed: f32) -> Self {
@@ -78,11 +76,8 @@ impl CameraController {
             is_backward_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
-            is_mouse_pressed: false,
             is_up_pressed: false,
             is_down_pressed: false,
-            prev_cursor: [0.0; 2],
-            curr_cursor: [0.0; 2],
         }
     }
 
@@ -126,24 +121,17 @@ impl CameraController {
                     _ => false,
                 }
             }
-            WindowEvent::CursorMoved { position, .. } => {
-                self.prev_cursor = self.curr_cursor;
-                self.curr_cursor = [position.x as f32, position.y as f32];
-                false
-            }
-            WindowEvent::MouseInput {
-                state,
-                button: MouseButton::Right,
-                ..
-            } => {
-                self.is_mouse_pressed = *state == ElementState::Pressed;
-                true
-            }
             _ => false,
         }
     }
 
-    pub fn update_camera(&mut self, camera: &mut Camera, resolution: [f32; 2]) {
+    pub fn update_camera(
+        &mut self,
+        camera: &mut Camera,
+        resolution: [f32; 2],
+        prev_cursor: [f32; 2],
+        curr_cursor: [f32; 2],
+    ) {
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
 
@@ -181,31 +169,28 @@ impl CameraController {
 
         // ROTATION
 
-        if self.is_mouse_pressed {
-            if self.prev_cursor == self.curr_cursor {
-                return;
-            }
-            let ray_prev = camera.get_ray_dir(self.prev_cursor, resolution);
-            let ray_curr = camera.get_ray_dir(self.curr_cursor, resolution);
-            let diff = ray_curr - ray_prev;
-            // @HACK: Remove hardcoded camera sensitiviy
-            let d = -diff * 2.3;
-
-            let (target, eye) = (camera.target, camera.eye);
-            camera.target = camera.eye
-                + (camera.target + d - camera.eye).normalize()
-                    * (camera.target - camera.eye).magnitude();
-
-            let y = Vector3::new(0.0f32, 1.0, 0.0);
-            let v = camera.target - camera.eye;
-            let alpha = y.angle(v).0.to_degrees();
-            let beta = (-y).angle(v).0.to_degrees();
-            if alpha < CAMERA_MIN_Y_ANGLE || beta < CAMERA_MIN_Y_ANGLE {
-                // @TODO: allow to move to be just on the edge of max rotation
-                (camera.target, camera.eye) = (target, eye);
-            }
+        if prev_cursor == curr_cursor {
+            return;
         }
+        let ray_prev = camera.get_ray_dir(prev_cursor, resolution);
+        let ray_curr = camera.get_ray_dir(curr_cursor, resolution);
+        let diff = ray_curr - ray_prev;
+        // @TODO: to make the camera smoother maybe interpolate between the diff's in a set of frames
+        //        and compute the rotation direction that way
+        let d = diff * CAMERA_MOUSE_SENSITIVITY;
 
-        self.prev_cursor = self.curr_cursor;
+        let (target, eye) = (camera.target, camera.eye);
+        camera.target = camera.eye
+            + (camera.target + d - camera.eye).normalize()
+                * (camera.target - camera.eye).magnitude();
+
+        let y = Vector3::new(0.0f32, 1.0, 0.0);
+        let v = camera.target - camera.eye;
+        let alpha = y.angle(v).0.to_degrees();
+        let beta = (-y).angle(v).0.to_degrees();
+        if alpha < CAMERA_MIN_Y_ANGLE || beta < CAMERA_MIN_Y_ANGLE {
+            // @TODO: allow to move to be just on the edge of max rotation
+            (camera.target, camera.eye) = (target, eye);
+        }
     }
 }

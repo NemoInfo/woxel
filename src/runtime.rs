@@ -1,4 +1,6 @@
+use log::warn;
 use winit::{
+    dpi::PhysicalPosition,
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoopWindowTarget},
     window::Window,
@@ -51,6 +53,57 @@ impl Runtime {
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                         self.context.resize(**new_inner_size);
                         self.scene.state.resolution = self.context.size.into();
+                    }
+                    WindowEvent::Focused(focus) => {
+                        if *focus {
+                            let [w, h]: [u32; 2] = self.window.inner_size().into();
+                            let pos = [w / 2, h / 2];
+
+                            match self
+                                .window
+                                .set_cursor_position(Into::<PhysicalPosition<u32>>::into(pos))
+                            {
+                                Ok(_) => {
+                                    self.scene.state.cursor_jumped =
+                                        Some([pos[0] as f32, pos[1] as f32]);
+                                }
+                                Err(_) => warn!("Failed to position cursor"),
+                            }
+
+                            self.window
+                                .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                                .unwrap_or_else(|_| warn!("Failed to grab cursor"));
+                        } else {
+                            let [w, h]: [u32; 2] = self.window.inner_size().into();
+                            let pos = [w / 2, h / 2];
+
+                            self.window
+                                .set_cursor_position(Into::<PhysicalPosition<u32>>::into(pos))
+                                .unwrap_or_else(|_| warn!("Failed to position cursor"));
+
+                            self.window
+                                .set_cursor_grab(winit::window::CursorGrabMode::None)
+                                .unwrap_or_else(|_| warn!("Failed to ungrab cursor"));
+                        }
+                    }
+                    WindowEvent::CursorMoved { position, .. } => {
+                        let [x, y]: [f64; 2] = (*position).into();
+                        let [w, h]: [u32; 2] = self.window.inner_size().into();
+
+                        if x as u32 == w - 1 || x as u32 == 0 {
+                            let pos = [w / 2, y as u32];
+                            self.window
+                                .set_cursor_position(Into::<PhysicalPosition<u32>>::into(pos))
+                                .unwrap_or_else(|_| warn!("Failed to position cursor"));
+                            self.scene.state.cursor_jumped = Some([pos[0] as f32, pos[1] as f32]);
+                        }
+                        if y as u32 == h - 1 || y as u32 == 0 {
+                            let pos = [x as u32, h / 2];
+                            self.window
+                                .set_cursor_position(Into::<PhysicalPosition<u32>>::into(pos))
+                                .unwrap_or_else(|_| warn!("Failed to position cursor"));
+                            self.scene.state.cursor_jumped = Some([pos[0] as f32, pos[1] as f32]);
+                        }
                     }
                     _ => {}
                 }

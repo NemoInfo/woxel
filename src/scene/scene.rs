@@ -26,13 +26,17 @@ impl Scene {
     }
 
     pub fn update(&mut self) {
-        self.camera_controller
-            .update_camera(&mut self.camera, self.state.resolution);
+        self.camera_controller.update_camera(
+            &mut self.camera,
+            self.state.resolution,
+            self.state.prev_cursor,
+            self.state.curr_cursor,
+        );
         self.state.update();
     }
 
     pub fn input(&mut self, event: &WindowEvent) {
-        self.camera_controller.process_events(event);
         self.state.process_events(event);
+        self.camera_controller.process_events(event);
     }
 }

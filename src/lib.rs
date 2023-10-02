@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 
 mod vdb;
 
-use winit::dpi::{PhysicalSize, Size};
+use winit::dpi::{PhysicalPosition, PhysicalSize, Size};
 use winit::event_loop::EventLoop;
 use winit::window::WindowBuilder;
 
@@ -36,6 +36,8 @@ pub async fn run() {
         .with_inner_size(DEFAULT_SIZE)
         .build(&event_loop)
         .unwrap();
+
+    window.set_cursor_visible(false);
 
     if let Some(monitor) = window.current_monitor() {
         let screen_size = monitor.size();
