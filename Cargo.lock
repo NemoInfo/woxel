@@ -1945,6 +1945,7 @@ dependencies = [
  "console_log",
  "env_logger",
  "glam",
+ "instant",
  "log",
  "pollster",
  "tracing",

@@ -5,6 +5,7 @@ pub struct State {
     pub prev_cursor: [f32; 2],
     pub curr_cursor: [f32; 2],
     pub cursor_jumped: Option<[f32; 2]>,
+    pub time_last_frame: instant::Instant,
 }
 
 impl State {
@@ -14,6 +15,7 @@ impl State {
             prev_cursor: [0.0; 2],
             curr_cursor: [0.0; 2],
             cursor_jumped: None,
+            time_last_frame: instant::Instant::now(),
         }
     }
 
@@ -32,6 +34,7 @@ impl State {
     pub fn update(&mut self) {
         self.prev_cursor = self.curr_cursor;
         self.check_jumped();
+        self.time_last_frame = instant::Instant::now();
     }
 
     pub fn check_jumped(&mut self) {
