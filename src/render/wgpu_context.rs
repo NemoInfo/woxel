@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use log::warn;
-use wgpu::{BindGroup, BindGroupLayout, ComputePipeline, ShaderModule, Texture};
+use wgpu::{BindGroup, BindGroupLayout, ShaderModule, Texture};
 use winit::window::Window;
 
 use crate::scene::Scene;

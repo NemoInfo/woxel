@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 
 mod vdb;
 
-use winit::dpi::{PhysicalPosition, PhysicalSize, Size};
+use winit::dpi::{PhysicalSize, Size};
 use winit::event_loop::EventLoop;
 use winit::window::WindowBuilder;
 

@@ -19,12 +19,12 @@ var texture: texture_storage_2d<rgba8unorm, write>;
 
 @compute @workgroup_size(8,4)
 fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
-    var p = vec2<f32>(global_id.xy) + vec2(0.01);
+    var p = vec2<f32>(global_id.xy) + vec2(0.001);
     var ray_dir = normalize((p.x * r.u + p.y * r.mv + r.wp).xyz);
     var color = vec4(cast_ray(camera.eye, ray_dir),1.0);
     textureStore(texture, global_id.xy, color);
 }
-const MAX_RAY_STEPS: i32 = 64;
+const MAX_RAY_STEPS: i32 = 512;
 fn cast_ray(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     var ipos = vec3<i32>(floor(src));
     var deltaDist = abs(vec3<f32>(length(dir)) / dir);

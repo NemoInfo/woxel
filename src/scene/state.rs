@@ -8,6 +8,7 @@ pub struct State {
     pub prev_cursor: [f32; 2],
     pub curr_cursor: [f32; 2],
     pub cursor_jumped: Option<[f32; 2]>,
+    pub cursor_grabbed: bool,
     pub time_last_frame: instant::Instant,
     pub initial_time: instant::Instant,
     pub total_time_elapsed: u64,
@@ -22,6 +23,7 @@ impl State {
             prev_cursor: [0.0; 2],
             curr_cursor: [0.0; 2],
             cursor_jumped: None,
+            cursor_grabbed: false,
             time_last_frame: instant::Instant::now(),
             initial_time: instant::Instant::now(),
             total_time_elapsed: 0,
@@ -33,10 +35,13 @@ impl State {
     pub fn process_events(&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::CursorMoved { position, .. } => {
+                if !self.cursor_grabbed {
+                    return false;
+                }
                 self.check_jumped();
                 self.prev_cursor = self.curr_cursor;
                 self.curr_cursor = [position.x as f32, position.y as f32];
-                false
+                true
             }
             _ => false,
         }
