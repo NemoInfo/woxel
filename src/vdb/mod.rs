@@ -3,3 +3,6 @@ pub use data_structure::*;
 
 mod vdb345;
 pub use vdb345::*;
+
+mod write;
+pub use write::*;

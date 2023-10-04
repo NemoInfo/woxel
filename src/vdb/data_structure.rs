@@ -102,7 +102,7 @@ where
     pub data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize],
     pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
     pub child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
-    pub origin: [u32; 3],
+    pub origin: [i32; 3],
 }
 
 impl<ValueType, ChildType, const LOG2_D: u64> InternalNode<ValueType, ChildType, LOG2_D>

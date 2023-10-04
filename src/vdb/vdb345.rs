@@ -22,6 +22,7 @@ where
             .map
             .entry(root_key)
             .or_insert_with(|| RootData::Node(Box::new(<N5<ValueType>>::new())));
+        // @TODO: This makes the origin of every node to be 0 0 0
 
         if let RootData::Tile(..) = root_entry {
             *root_entry = RootData::Node(Box::new(<N5<ValueType>>::new()));
@@ -46,10 +47,10 @@ where
                     node_3.data[bit_index_0] = LeafData::Value(v);
                 }
             } else {
-                panic!("Unreachable")
+                unreachable!();
             }
         } else {
-            panic!("Unreachable")
+            unreachable!();
         }
     }
 
