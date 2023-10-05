@@ -201,6 +201,8 @@ fn write_transform(b: &mut BytesMut, mat: [[f64; 4]; 4]) -> fmt::Result {
 }
 
 fn write_metadata(b: &mut BytesMut) -> fmt::Result {
+    b.put_u32(4);
+
     write_meta_string(b, "class", "unknown")?;
     write_meta_string(b, "file_compression", "none")?;
     write_meta_bool(b, "is_saved_as_half_float", false)?;
