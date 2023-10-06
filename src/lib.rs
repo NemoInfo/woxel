@@ -1,5 +1,7 @@
 #![feature(generic_const_exprs)]
 #![feature(raw_ref_op)]
+use std::io::BufReader;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
@@ -16,11 +18,16 @@ mod scene;
 use crate::render::WgpuContext;
 use crate::runtime::Runtime;
 use crate::scene::Scene;
+use crate::vdb::VdbReader;
 
 const DEFAULT_SIZE: Size = Size::Physical(PhysicalSize::new(1600, 900));
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub async fn run() {
+    let f = std::fs::File::open("assets/utahteapot.vdb").unwrap();
+    let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
+    let vdb = vdb_reader.read_vdb345_grid::<f32>("ls_utahteapot").unwrap();
+
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));

@@ -8,11 +8,12 @@ pub type VDB345<ValueType> = VDB<ValueType, N5<ValueType>>;
 
 impl<'a, ValueType> VDB345<ValueType>
 where
-    ValueType: Default + std::fmt::Display,
+    ValueType: Default,
 {
     /// Sets the value `v` of a single voxel in the VDB at point `p`.
-    pub fn set_voxel(&mut self, p: [u32; 3], v: ValueType) {
-        let root_key = self.root.root_key_from_coords(p);
+    pub fn set_voxel(&mut self, p: [i32; 3], v: ValueType) {
+        let p: [u32; 3] = self.grid_descriptor.world_to_u(p);
+        let root_key = <Root345<ValueType>>::root_key_from_coords(p);
         let bit_index_4 = <N5<ValueType>>::bit_index_from_coords(p);
         let bit_index_3 = <N4<ValueType>>::bit_index_from_coords(p);
         let bit_index_0 = <N3<ValueType>>::bit_index_from_coords(p);
@@ -55,8 +56,9 @@ where
     }
 
     /// Returns the value of a single voxel in the VDB at point `p`.
-    pub fn get_voxel(&self, p: [u32; 3]) -> VdbEndpoint<&ValueType> {
-        let root_key = self.root.root_key_from_coords(p);
+    pub fn get_voxel(&self, p: [i32; 3]) -> VdbEndpoint<&ValueType> {
+        let p: [u32; 3] = self.grid_descriptor.world_to_u(p);
+        let root_key = <Root345<ValueType>>::root_key_from_coords(p);
 
         let Some(root_data) = self.root.map.get(&root_key) else { return VdbEndpoint::Bkgr(&self.root.background) };
         match root_data {

@@ -1,4 +1,10 @@
-use std::{any::type_name, collections::HashMap};
+use bitflags::bitflags;
+use cgmath::{num_traits::ToPrimitive, Zero};
+use std::{
+    any::type_name,
+    collections::HashMap,
+    io::{Read, Seek, SeekFrom},
+};
 
 pub trait Node {
     const LOG2_D: u64;
@@ -22,7 +28,7 @@ pub trait Node {
         (z | (y << Self::LOG2_D) | (x << ((Self::LOG2_D) << 1))) as usize
     }
 
-    fn pretty_print_inner(&self, input: &mut String, offset: usize);
+    // fn pretty_print_inner(&self, input: &mut String, offset: usize);
 }
 
 #[derive(Debug)]
@@ -30,7 +36,7 @@ pub struct LeafNode<ValueType, const LOG2_D: u64>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    ValueType: std::fmt::Display,
+    //    ValueType: std::fmt::Display,
 {
     pub data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize],
     pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
@@ -41,35 +47,35 @@ impl<ValueType, const LOG2_D: u64> Node for LeafNode<ValueType, LOG2_D>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    ValueType: std::fmt::Display,
+    //   ValueType: std::fmt::Display,
 {
     const LOG2_D: u64 = LOG2_D;
     const TOTAL_LOG2_D: u64 = LOG2_D;
 
-    fn pretty_print_inner(&self, input: &mut String, offset: usize) {
-        let border: String = " ".repeat(offset);
-        *input += &format!("{}{}\n", border, type_name::<Self>(),);
-        *input += &format!("{}data:\n", border);
-        *input += &border.clone();
-        for val in &self.data {
-            match val {
-                LeafData::Offset(_) => {
-                    *input += "o";
-                }
-                LeafData::Value(v) => {
-                    *input += &format!("{}", v);
-                }
-            }
-        }
-        *input += "\n";
-    }
+    // fn pretty_print_inner(&self, input: &mut String, offset: usize) {
+    //     let border: String = " ".repeat(offset);
+    //     *input += &format!("{}{}\n", border, type_name::<Self>(),);
+    //     *input += &format!("{}data:\n", border);
+    //     *input += &border.clone();
+    //     for val in &self.data {
+    //         match val {
+    //             LeafData::Offset(_) => {
+    //                 *input += "o";
+    //             }
+    //             LeafData::Value(v) => {
+    //                 *input += &format!("{}", v);
+    //             }
+    //         }
+    //     }
+    //     *input += "\n";
+    // }
 }
 
 impl<ValueType, const LOG2_D: u64> LeafNode<ValueType, LOG2_D>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    ValueType: std::fmt::Display,
+    //    ValueType: std::fmt::Display,
 {
     pub fn new() -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
@@ -139,27 +145,27 @@ where
     const LOG2_D: u64 = LOG2_D;
     const TOTAL_LOG2_D: u64 = LOG2_D + ChildType::TOTAL_LOG2_D;
 
-    fn pretty_print_inner(&self, input: &mut String, offset: usize) {
-        let border: String = " ".repeat(offset);
-        *input += &format!(
-            "{}{} {} {}: {}\n",
-            border,
-            self.origin[0],
-            self.origin[1],
-            self.origin[2],
-            type_name::<Self>(),
-        );
-        *input += &format!("{}data:\n", border);
-        for val in &self.data {
-            match val {
-                InternalData::Tile(_) => {}
-                InternalData::Node(child) => {
-                    child.pretty_print_inner(input, offset + 2);
-                }
-            }
-        }
-        *input += "\n";
-    }
+    // fn pretty_print_inner(&self, input: &mut String, offset: usize) {
+    //     let border: String = " ".repeat(offset);
+    //     *input += &format!(
+    //         "{}{} {} {}: {}\n",
+    //         border,
+    //         self.origin[0],
+    //         self.origin[1],
+    //         self.origin[2],
+    //         type_name::<Self>(),
+    //     );
+    //     *input += &format!("{}data:\n", border);
+    //     for val in &self.data {
+    //         match val {
+    //             InternalData::Tile(_) => {}
+    //             InternalData::Node(child) => {
+    //                 child.pretty_print_inner(input, offset + 2);
+    //             }
+    //         }
+    //     }
+    //     *input += "\n";
+    // }
 }
 
 #[derive(Debug)]
@@ -191,24 +197,24 @@ where
         Self { map, background }
     }
 
-    pub fn pretty_print(&self, input: &mut String) {
-        for (key, val) in self.map.iter() {
-            if let RootData::Node(node) = val {
-                *input += &format!(
-                    "{} {} {}: {}\n",
-                    key[0],
-                    key[1],
-                    key[2],
-                    type_name::<ChildType>()
-                );
-                node.pretty_print_inner(input, 2);
-            }
-        }
-    }
+    // pub fn pretty_print(&self, input: &mut String) {
+    //     for (key, val) in self.map.iter() {
+    //         if let RootData::Node(node) = val {
+    //             *input += &format!(
+    //                 "{} {} {}: {}\n",
+    //                 key[0],
+    //                 key[1],
+    //                 key[2],
+    //                 type_name::<ChildType>()
+    //             );
+    //             node.pretty_print_inner(input, 2);
+    //         }
+    //     }
+    // }
 }
 
 impl<ValueType, ChildType: Node> RootNode<ValueType, ChildType> {
-    pub fn root_key_from_coords(&self, p: [u32; 3]) -> [u32; 3] {
+    pub fn root_key_from_coords(p: [u32; 3]) -> [u32; 3] {
         p.map(|c| c & !((1 << ChildType::TOTAL_LOG2_D) - 1))
     }
 }
@@ -222,12 +228,28 @@ pub struct VDB<ValueType, ChildType: Node> {
 #[derive(Debug, Clone)]
 pub struct GridDescriptor {
     pub name: String,
+    /// If not empty, the name of another grid that shares this grid's tree
     pub instance_parent: String,
     pub grid_type: String,
+    /// Location in the stream where the grid data is stored
+    pub grid_pos: u64,
+    /// Location in the stream where the grid blocks are stored
     pub block_pos: u64,
+    /// Location in the stream where the next grid descriptor begins
     pub end_pos: u64,
-    pub compression: u32,
-    pub meta_data: String,
+    pub compression: Compression,
+    pub meta_data: Metadata,
+    pub bbox_min: cgmath::Vector3<i32>,
+}
+
+impl GridDescriptor {
+    pub fn seek_to_grid<R: Read + Seek>(&self, reader: &mut R) -> Result<u64, std::io::Error> {
+        reader.seek(SeekFrom::Start(self.grid_pos))
+    }
+
+    pub fn world_to_u(&self, p: [i32; 3]) -> [u32; 3] {
+        p.map(|c| (c + 1000) as u32)
+    }
 }
 
 impl<ValueType, ChildType: Node> VDB<ValueType, ChildType>
@@ -240,10 +262,12 @@ where
             name: "Demo".to_string(),
             instance_parent: "What".to_string(),
             grid_type: "Whatt".to_string(),
+            grid_pos: 0,
             block_pos: 0,
             end_pos: 0,
-            compression: 1,
-            meta_data: "Whatt".to_string(),
+            compression: Compression::NONE,
+            meta_data: Default::default(),
+            bbox_min: cgmath::Vector3::zero(),
         };
 
         Self {
@@ -260,6 +284,50 @@ pub enum VdbEndpoint<ValueType> {
     Innr(ValueType, u8),
     Root(ValueType),
     Bkgr(ValueType),
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Metadata(pub HashMap<String, MetadataValue>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetadataValue {
+    String(String),
+    Vec3i(cgmath::Vector3<i32>),
+    I32(i32),
+    I64(i64),
+    Float(f32),
+    Bool(bool),
+    Unknown { name: String, data: Vec<u8> },
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Compression: u32 {
+        const NONE = 0;
+        const ZIP = 0x1;
+        const ACTIVE_MASK = 0x2;
+        const BLOSC = 0x4;
+        const DEFAULT_COMPRESSION = Self::BLOSC.bits() | Self::ACTIVE_MASK.bits();
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ArchiveHeader {
+    /// The version of the file that was read
+    pub file_version: u32,
+    /// The version of the library that was used to create the file that was read
+    pub library_major: u32,
+    pub library_minor: u32,
+    /// Unique tag, a random 16-byte (128-bit) value, stored as a string format.
+    pub uuid: String,
+    /// Flag indicating whether the input stream contains grid offsets and therefore supports partial reading
+    pub has_grid_offsets: bool,
+    /// Flags indicating whether and how the data stream is compressed
+    pub compression: Compression,
+    /// the number of grids on the input stream
+    pub grid_number: u32,
+    /// The metadata for the input stream
+    pub meta_data: Metadata,
 }
 
 type N3 = LeafNode<u64, 3>;

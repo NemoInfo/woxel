@@ -24,7 +24,7 @@ fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var color = vec4(cast_ray(camera.eye, ray_dir),1.0);
     textureStore(texture, global_id.xy, color);
 }
-const MAX_RAY_STEPS: i32 = 512;
+const MAX_RAY_STEPS: i32 = 64;
 fn cast_ray(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     var ipos = vec3<i32>(floor(src));
     var deltaDist = abs(vec3<f32>(length(dir)) / dir);

@@ -15,11 +15,11 @@ pub fn write_vdb<T: std::fmt::Display + Copy + CopyBytesToU32>(
     b.put_bytes(0, 4);
 
     // File version
-    b.put_u32(224);
+    b.put_u32_le(224);
 
     // Library Version
-    b.put_u32(8);
-    b.put_u32(1);
+    b.put_u32_le(8);
+    b.put_u32_le(1);
 
     // No grid offsets
     b.put_u8(0);
@@ -28,10 +28,10 @@ pub fn write_vdb<T: std::fmt::Display + Copy + CopyBytesToU32>(
     b.write_str("d2b59639-ac2f-4047-9c50-9648f951180c")?;
 
     // Metadata
-    b.put_u32(0);
+    b.put_u32_le(0);
 
     // # of grids
-    b.put_u32(1);
+    b.put_u32_le(1);
 
     write_grid(b, vdb, mat)?;
 
@@ -52,7 +52,7 @@ fn write_grid<T: std::fmt::Display + Copy + CopyBytesToU32>(
     write_len_based_str(b, "Tree_float_5_4_3")?;
 
     // No instance parent
-    b.put_u32(0);
+    b.put_u32_le(0);
 
     // Grid descriptor stream position
     b.put_u64((b.len() + (size_of::<u64>() * 3)) as u64);
@@ -60,7 +60,7 @@ fn write_grid<T: std::fmt::Display + Copy + CopyBytesToU32>(
     b.put_u64(0);
 
     // No compression
-    b.put_u32(0);
+    b.put_u32_le(0);
 
     write_metadata(b)?;
     write_transform(b, mat)?;
@@ -74,16 +74,16 @@ fn write_tree<T: std::fmt::Display + Copy + CopyBytesToU32>(
     vdb: &VDB345<T>,
 ) -> fmt::Result {
     // Magic
-    b.put_u32(1);
+    b.put_u32_le(1);
 
     // Root node background value
-    b.put_u32(vdb.root.background.copy_bytes_to_u32());
+    b.put_u32_le(vdb.root.background.copy_bytes_to_u32());
 
     // Number of top level tiles
-    b.put_u32(0);
+    b.put_u32_le(0);
 
     // Number of 5 nodes
-    b.put_u32(vdb.root.map.len() as u32);
+    b.put_u32_le(vdb.root.map.len() as u32);
 
     // Iterate node 5s
     for (_, node5_data) in &vdb.root.map {
@@ -139,7 +139,7 @@ fn write_node5_header<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, n
     for i in 0..(node5.value_mask.len() * 64) {
         let value = &node5.data[i];
         if let InternalData::Tile(value) = value {
-            b.put_u32(value.copy_bytes_to_u32());
+            b.put_u32_le(value.copy_bytes_to_u32());
         }
     }
 }
@@ -160,7 +160,7 @@ fn write_node4_header<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, n
     for i in 0..(node4.value_mask.len() * 64) {
         let value = &node4.data[i];
         if let InternalData::Tile(value) = value {
-            b.put_u32(value.copy_bytes_to_u32());
+            b.put_u32_le(value.copy_bytes_to_u32());
         }
     }
 }
@@ -181,8 +181,8 @@ fn write_node3_data<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, nod
     for data in &node3.data {
         match data {
             // @HACK: figure out the offsets size and shape and purpose =)))
-            LeafData::Offset(_) => b.put_u32(0),
-            LeafData::Value(val) => b.put_u32(val.copy_bytes_to_u32()),
+            LeafData::Offset(_) => b.put_u32_le(0),
+            LeafData::Value(val) => b.put_u32_le(val.copy_bytes_to_u32()),
         }
     }
 }
@@ -201,7 +201,7 @@ fn write_transform(b: &mut BytesMut, mat: [[f64; 4]; 4]) -> fmt::Result {
 }
 
 fn write_metadata(b: &mut BytesMut) -> fmt::Result {
-    b.put_u32(4);
+    b.put_u32_le(4);
 
     write_meta_string(b, "class", "unknown")?;
     write_meta_string(b, "file_compression", "none")?;
@@ -222,14 +222,14 @@ fn write_meta_string(b: &mut BytesMut, name: &str, string: &str) -> fmt::Result 
 fn write_meta_bool(b: &mut BytesMut, name: &str, v: bool) -> fmt::Result {
     write_len_based_str(b, name)?;
     write_len_based_str(b, "bool")?;
-    b.put_u32(1);
+    b.put_u32_le(1);
     b.put_u8(v as u8);
 
     Ok(())
 }
 
 fn write_len_based_str(b: &mut BytesMut, s: &str) -> fmt::Result {
-    b.put_u32(s.len() as u32);
+    b.put_u32_le(s.len() as u32);
     b.write_str(s)?;
 
     Ok(())
@@ -275,6 +275,8 @@ mod tests {
             [0., 0., 0., 1.],
         ];
         let _ = write_vdb(&mut b, &vdb, mat);
+
+        println!("{:#x}", b);
 
         let mut file = fs::File::create("assets/test.vdb").unwrap();
         let res = file.write_all(&b);
