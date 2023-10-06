@@ -4,12 +4,15 @@ use std::{
     string::FromUtf8Error,
 };
 
+use bitvec::prelude::*;
+use blosc_src::blosc_cbuffer_sizes;
+use bytemuck::{bytes_of_mut, cast_slice_mut, Pod, Zeroable};
 use byteorder::{LittleEndian, ReadBytesExt};
-use cgmath::{num_traits::FromBytes, Vector3, Zero};
+use cgmath::{Vector3, Zero};
 use half::f16;
 use log::{trace, warn};
 
-use crate::vdb::{Compression, Node, Root345, RootData, N5};
+use crate::vdb::{Compression, Node, NodeHeader, NodeMetaData, Root345, RootData, N5};
 
 use super::transform::Map;
 use super::{ArchiveHeader, GridDescriptor, Metadata, MetadataValue, VDB345};
@@ -39,6 +42,12 @@ pub enum ErrorKind {
     InvalidGridName(String),
     #[error("File bbox min not provided")]
     FileBboxMinNotFound,
+    #[error("Invalid node metadata entry (u8)")]
+    InvalidNodeMetadata(u8),
+    #[error("Unsupported Blosc format")]
+    UnsupportedBloscFormat,
+    #[error("Invalid Blsoc data")]
+    InvalidBloscData,
 }
 
 pub struct VdbReader<R: Read + Seek> {
@@ -109,7 +118,7 @@ impl<R: Read + Seek> VdbReader<R> {
         })
     }
 
-    pub fn read_vdb345_grid<T: From4LeBytes + std::fmt::Debug>(
+    pub fn read_vdb345_grid<T: From4LeBytes + std::fmt::Debug + Pod>(
         &mut self,
         name: &str,
     ) -> Result<VDB345<T>> {
@@ -262,7 +271,7 @@ impl<R: Read + Seek> VdbReader<R> {
         Ok(meta_data)
     }
 
-    fn read_tree_topology<T: From4LeBytes + std::fmt::Debug>(
+    fn read_tree_topology<T: From4LeBytes + std::fmt::Debug + Pod>(
         &mut self,
         grid_descriptor: &GridDescriptor,
     ) -> Result<VDB345<T>> {
@@ -305,7 +314,20 @@ impl<R: Read + Seek> VdbReader<R> {
         for _ in 0..number_of_node5s {
             let origin: [i32; 3] = read_vec3i(&mut self.reader)?.into();
 
-            let node_5: Result<N5<T>> = self.read_internal_node_header::<T, N5<T>>();
+            let node_5_header = self.read_internal_node_header::<T, N5<T>>(&grid_descriptor)?;
+
+            let mut node_5 = <N5<T>>::new();
+
+            assert_eq!(
+                node_5_header.child_mask.len(),
+                <N5<T>>::SIZE * 64,
+                "Read mask is not the same length as expected mask"
+            );
+
+            let slice: &[u64] = node_5_header.child_mask.as_raw_slice();
+            // let array = [0u64; <N5<T>>::SIZE / 64];
+
+            todo!()
         }
 
         dbg!(node5s_entry);
@@ -313,12 +335,202 @@ impl<R: Read + Seek> VdbReader<R> {
         todo!()
     }
 
-    fn read_internal_node_header<T, N: Node>(&mut self) -> Result<N5<T>> {
-        let mut child_mask = vec![0_u64; N::SIZE as usize / 64];
-        let mut value_mask = vec![0_u64; N::SIZE as usize / 64];
-        self.reader.read_u64_into::<LittleEndian>(&mut child_mask)?;
-        self.reader.read_u64_into::<LittleEndian>(&mut value_mask)?;
-        todo!();
+    fn read_internal_node_header<T: Pod, N: Node>(
+        &mut self,
+        grid_descriptor: &GridDescriptor,
+    ) -> Result<NodeHeader<T>> {
+        let mut child_mask = bitvec![u64, Lsb0; 0; N::SIZE];
+        let mut value_mask = bitvec![u64, Lsb0; 0; N::SIZE];
+        self.reader
+            .read_u64_into::<LittleEndian>(child_mask.as_raw_mut_slice())?;
+        self.reader
+            .read_u64_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
+
+        let size = if self.header.file_version < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION {
+            child_mask.count_zeros()
+        } else {
+            N::SIZE
+        };
+
+        let data = self.read_compressed(grid_descriptor, size, value_mask.as_bitslice())?;
+
+        Ok(NodeHeader {
+            child_mask,
+            value_mask,
+            data,
+            log_2_dim: N::LOG2_D,
+        })
+    }
+
+    fn read_compressed<T: Pod>(
+        &mut self,
+        grid_descriptor: &GridDescriptor,
+        size: usize,
+        value_mask: &BitSlice<u64>,
+    ) -> Result<Vec<T>> {
+        let mut meta_data: NodeMetaData = NodeMetaData::NoMaskAndAllVals;
+        if self.header.file_version >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION {
+            meta_data = self.reader.read_u8()?.try_into()?;
+        }
+
+        let mut inactive_val0 = T::zeroed();
+        let mut inactive_val1 = T::zeroed();
+        match meta_data {
+            NodeMetaData::MaskAndOneInactiveVal | NodeMetaData::NoMaskAndOneInactiveVal => {
+                self.reader.read_exact(bytes_of_mut(&mut inactive_val0))?;
+            }
+            NodeMetaData::MaskAndTwoInactiveVals => {
+                self.reader.read_exact(bytes_of_mut(&mut inactive_val0))?;
+                self.reader.read_exact(bytes_of_mut(&mut inactive_val1))?;
+            }
+            _ => {}
+        }
+
+        let mut selection_mask = bitvec![u64, Lsb0; 0; size];
+
+        if meta_data == NodeMetaData::MaskAndNoInactiveVals
+            || meta_data == NodeMetaData::MaskAndOneInactiveVal
+            || meta_data == NodeMetaData::MaskAndTwoInactiveVals
+        {
+            self.reader
+                .read_u64_into::<LittleEndian>(selection_mask.as_raw_mut_slice())?;
+        }
+
+        let count = if grid_descriptor
+            .compression
+            .contains(Compression::ACTIVE_MASK)
+            && meta_data != NodeMetaData::NoMaskAndAllVals
+            && self.header.file_version >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION
+        {
+            value_mask.count_ones()
+        } else {
+            size
+        };
+
+        let data: Vec<T> = if grid_descriptor.meta_data.is_half_float()
+            && std::any::TypeId::of::<T>() == std::any::TypeId::of::<f32>()
+        {
+            let data = self.read_compressed_data::<f16>(grid_descriptor, count)?;
+            bytemuck::cast_vec(data.into_iter().map(f16::to_f32).collect::<Vec<f32>>())
+        } else if !grid_descriptor.meta_data.is_half_float() {
+            let data = self.read_compressed_data::<f32>(grid_descriptor, count)?;
+            bytemuck::cast_vec(data.into_iter().map(f16::from_f32).collect::<Vec<_>>())
+        } else {
+            self.read_compressed_data(grid_descriptor, count)?
+        };
+
+        Ok(
+            if grid_descriptor
+                .compression
+                .contains(Compression::ACTIVE_MASK)
+                && data.len() != size
+            {
+                trace!("Expanding active maska data {} to {}", data.len(), size);
+
+                let mut expanded = vec![T::zeroed(); size];
+                let mut read_idx = 0;
+                for dest_idx in 0..size {
+                    expanded[dest_idx] = if value_mask[dest_idx] {
+                        let v = data[read_idx];
+                        read_idx += 1;
+                        v
+                    } else if selection_mask[dest_idx] {
+                        inactive_val1
+                    } else {
+                        inactive_val0
+                    }
+                }
+                expanded
+            } else {
+                data
+            },
+        )
+    }
+
+    fn read_compressed_data<T: Pod>(
+        &mut self,
+        grid_descriptor: &GridDescriptor,
+        count: usize,
+    ) -> Result<Vec<T>> {
+        Ok(match grid_descriptor.compression {
+            c if c.contains(Compression::BLOSC) => {
+                let num_compressed_bytes = self.reader.read_i64::<LittleEndian>()?;
+                let compressed_count = num_compressed_bytes / std::mem::size_of::<T>() as i64;
+
+                trace!("Reading blosc data, {} bytes", num_compressed_bytes);
+                if num_compressed_bytes <= 0 {
+                    let mut data = vec![T::zeroed(); (-compressed_count) as usize];
+                    self.reader.read_exact(cast_slice_mut(&mut data))?;
+                    assert_eq!(-compressed_count as usize, count);
+                    data
+                } else {
+                    let mut blosc_data = vec![0u8; num_compressed_bytes as usize];
+                    self.reader.read_exact(&mut blosc_data)?;
+                    if count > 0 {
+                        let mut nbytes: usize = 0;
+                        let mut cbytes: usize = 0;
+                        let mut blocksize: usize = 0;
+                        unsafe {
+                            blosc_cbuffer_sizes(
+                                blosc_data.as_ptr().cast(),
+                                &mut nbytes,
+                                &mut cbytes,
+                                &mut blocksize,
+                            )
+                        };
+                        if nbytes == 0 {
+                            return Err(ErrorKind::UnsupportedBloscFormat);
+                        }
+                        let dest_size = nbytes / std::mem::size_of::<T>();
+                        let mut dest: Vec<T> = vec![Zeroable::zeroed(); dest_size];
+                        let error = unsafe {
+                            blosc_src::blosc_decompress_ctx(
+                                blosc_data.as_ptr().cast(),
+                                dest.as_mut_ptr().cast(),
+                                nbytes,
+                                1,
+                            )
+                        };
+                        if error < 1 {
+                            return Err(ErrorKind::InvalidBloscData);
+                        }
+                        dest
+                    } else {
+                        trace!(
+                            "Skipping blosc decompression because of a {}-count read",
+                            count
+                        );
+                        vec![T::zeroed(); 0]
+                    }
+                }
+            }
+            c if c.contains(Compression::ZIP) => {
+                let num_zipped_bytes = self.reader.read_i64::<LittleEndian>()?;
+                let compressed_count = num_zipped_bytes / std::mem::size_of::<T>() as i64;
+
+                trace!("Reading zipped data, {} bytes", num_zipped_bytes);
+                if num_zipped_bytes <= 0 {
+                    let mut data = vec![T::zeroed(); (-compressed_count) as usize];
+                    self.reader.read_exact(cast_slice_mut(&mut data))?;
+                    data
+                } else {
+                    let mut zipped_data = vec![0u8; num_zipped_bytes as usize];
+                    self.reader.read_exact(&mut zipped_data)?;
+
+                    let mut zip_reader = flate2::read::ZlibDecoder::new(zipped_data.as_slice());
+                    let mut data = vec![T::zeroed(); count];
+                    zip_reader.read_exact(cast_slice_mut(&mut data))?;
+                    data
+                }
+            }
+            _ => {
+                trace!("Reading uncompressed data, {} elements", count);
+
+                let mut data = vec![T::zeroed(); count];
+                self.reader.read_exact(cast_slice_mut(&mut data))?;
+                data
+            }
+        })
     }
 }
 
@@ -384,6 +596,23 @@ fn read_vec3d<R: Read + Seek>(reader: &mut R) -> Result<Vector3<f64>> {
     let z = reader.read_f64::<LittleEndian>()?;
 
     Ok(Vector3 { x, y, z })
+}
+
+impl TryFrom<u8> for NodeMetaData {
+    type Error = ErrorKind;
+
+    fn try_from(v: u8) -> Result<NodeMetaData> {
+        Ok(match v {
+            0 => Self::NoMaskOrInactiveVals,
+            1 => Self::NoMaskAndMinusBg,
+            2 => Self::NoMaskAndOneInactiveVal,
+            3 => Self::MaskAndNoInactiveVals,
+            4 => Self::MaskAndOneInactiveVal,
+            5 => Self::MaskAndTwoInactiveVals,
+            6 => Self::NoMaskAndAllVals,
+            _ => return Err(ErrorKind::InvalidNodeMetadata(v)),
+        })
+    }
 }
 
 #[cfg(test)]

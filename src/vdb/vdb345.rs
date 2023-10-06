@@ -1,3 +1,5 @@
+use bytemuck::Pod;
+
 use crate::vdb::data_structure::*;
 
 pub type N3<ValueType> = LeafNode<ValueType, 3>;
@@ -8,7 +10,7 @@ pub type VDB345<ValueType> = VDB<ValueType, N5<ValueType>>;
 
 impl<'a, ValueType> VDB345<ValueType>
 where
-    ValueType: Default,
+    ValueType: Pod,
 {
     /// Sets the value `v` of a single voxel in the VDB at point `p`.
     pub fn set_voxel(&mut self, p: [i32; 3], v: ValueType) {

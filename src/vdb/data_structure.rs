@@ -1,7 +1,8 @@
 use bitflags::bitflags;
-use cgmath::{num_traits::ToPrimitive, Zero};
+use bitvec::vec::BitVec;
+use bytemuck::Pod;
+use cgmath::Zero;
 use std::{
-    any::type_name,
     collections::HashMap,
     io::{Read, Seek, SeekFrom},
 };
@@ -79,7 +80,7 @@ where
 {
     pub fn new() -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
-            std::array::from_fn(|i| LeafData::Offset(Self::SIZE - i));
+            std::array::from_fn(|i| LeafData::Offset(0));
         let value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
             [0; ((1 << (LOG2_D * 3)) / 64) as usize];
         let flags = 0;
@@ -115,12 +116,12 @@ impl<ValueType, ChildType, const LOG2_D: u64> InternalNode<ValueType, ChildType,
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    ValueType: Default,
+    ValueType: Pod,
     ChildType: Node,
 {
     pub fn new() -> Self {
         let data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize] =
-            std::array::from_fn(|_| InternalData::Tile(ValueType::default()));
+            std::array::from_fn(|_| InternalData::Tile(ValueType::zeroed()));
         let value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
             [0; ((1 << (LOG2_D * 3)) / 64) as usize];
         let child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
@@ -289,6 +290,12 @@ pub enum VdbEndpoint<ValueType> {
 #[derive(Debug, Default, Clone)]
 pub struct Metadata(pub HashMap<String, MetadataValue>);
 
+impl Metadata {
+    pub fn is_half_float(&self) -> bool {
+        self.0.get("is_saved_as_half_float") == Some(&MetadataValue::Bool(true))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum MetadataValue {
     String(String),
@@ -309,6 +316,25 @@ bitflags! {
         const BLOSC = 0x4;
         const DEFAULT_COMPRESSION = Self::BLOSC.bits() | Self::ACTIVE_MASK.bits();
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NodeMetaData {
+    NoMaskOrInactiveVals,
+    NoMaskAndMinusBg,
+    NoMaskAndOneInactiveVal,
+    MaskAndNoInactiveVals,
+    MaskAndOneInactiveVal,
+    MaskAndTwoInactiveVals,
+    NoMaskAndAllVals,
+}
+
+#[derive(Debug)]
+pub struct NodeHeader<ValueType> {
+    pub child_mask: BitVec<u64>,
+    pub value_mask: BitVec<u64>,
+    pub data: Vec<ValueType>,
+    pub log_2_dim: u64,
 }
 
 #[derive(Debug, Default)]
