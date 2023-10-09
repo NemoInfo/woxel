@@ -12,7 +12,10 @@ use cgmath::{Vector3, Zero};
 use half::f16;
 use log::{trace, warn};
 
-use crate::vdb::{Compression, Node, NodeHeader, NodeMetaData, Root345, RootData, N5};
+use crate::vdb::{
+    Compression, InternalData, LeafData, Node, NodeHeader, NodeMetaData, Root345, RootData,
+    RootNode, N3, N4, N5,
+};
 
 use super::transform::Map;
 use super::{ArchiveHeader, GridDescriptor, Metadata, MetadataValue, VDB345};
@@ -48,6 +51,8 @@ pub enum ErrorKind {
     UnsupportedBloscFormat,
     #[error("Invalid Blsoc data")]
     InvalidBloscData,
+    #[error("Unexpected Mask length")]
+    UnexpectedMaskLength,
 }
 
 pub struct VdbReader<R: Read + Seek> {
@@ -132,11 +137,13 @@ impl<R: Read + Seek> VdbReader<R> {
         }
         let _ = Self::read_metadata(&mut self.reader)?;
 
-        let transform = Self::read_transform(&mut self.reader)?;
+        // @TODO: Make a Grid struct to store the descriptot and the VDB
+        let _transform = Self::read_transform(&mut self.reader)?;
 
-        let tree = self.read_tree_topology::<T>(&grid_descriptor)?;
+        let mut vdb = self.read_tree_topology::<T>(&grid_descriptor)?;
+        self.read_tree_data::<T>(&grid_descriptor, &mut vdb)?;
 
-        todo!();
+        Ok(vdb)
     }
 
     fn read_transform(reader: &mut R) -> Result<Map> {
@@ -280,21 +287,14 @@ impl<R: Read + Seek> VdbReader<R> {
             todo!("Multi-buffer trees not implemented");
         }
 
-        dbg!(self.reader.stream_position()?);
-
-        // let root_node_background =
-        //     T::from_4_le_bytes(reader.read_u32::<LittleEndian>()?.to_le_bytes());
         // @TODO: What is the logic here for half_float? this takes up 4 bytes?
         let rn_bytes = self.reader.read_u32::<LittleEndian>()?;
         let root_node_background = T::from_4_le_bytes(rn_bytes.to_le_bytes());
 
         let number_of_tiles = self.reader.read_u32::<LittleEndian>()?;
         let number_of_node5s = self.reader.read_u32::<LittleEndian>()?;
-        dbg!(&root_node_background);
-        dbg!(&number_of_tiles);
-        dbg!(&number_of_node5s);
 
-        let mut node5s_entry = vec![];
+        let mut node5_entries = vec![];
 
         // Iterate Node5 tiles
         for _ in 0..number_of_tiles {
@@ -307,32 +307,57 @@ impl<R: Read + Seek> VdbReader<R> {
             let active = self.reader.read_u8()? == 1;
 
             let node5_tile = RootData::Tile::<T, N5<T>>(value, active);
-            node5s_entry.push((root_key, node5_tile));
+            node5_entries.push((root_key, node5_tile));
         }
 
         // Iterate Node5 Children
         for _ in 0..number_of_node5s {
             let origin: [i32; 3] = read_vec3i(&mut self.reader)?.into();
+            let uorigin: [u32; 3] = grid_descriptor.world_to_u(origin);
+            let root_key = <Root345<T>>::root_key_from_coords(uorigin);
 
             let node_5_header = self.read_internal_node_header::<T, N5<T>>(&grid_descriptor)?;
 
-            let mut node_5 = <N5<T>>::new();
-
-            assert_eq!(
-                node_5_header.child_mask.len(),
-                <N5<T>>::SIZE * 64,
-                "Read mask is not the same length as expected mask"
+            let mut node_5 = <N5<T>>::new_from_header(
+                try_from_bitvec(node_5_header.child_mask.clone())?,
+                try_from_bitvec(node_5_header.value_mask.clone())?,
+                origin,
             );
 
-            let slice: &[u64] = node_5_header.child_mask.as_raw_slice();
-            // let array = [0u64; <N5<T>>::SIZE / 64];
+            for idx in node_5_header.child_mask.iter_ones() {
+                let node_4_header = self.read_internal_node_header::<T, N4<T>>(&grid_descriptor)?;
+                let mut node_4 = <N4<T>>::new_from_header(
+                    try_from_bitvec(node_4_header.child_mask.clone())?,
+                    try_from_bitvec(node_4_header.value_mask.clone())?,
+                    [0; 3],
+                );
 
-            todo!()
+                for idx in node_4_header.child_mask.iter_ones() {
+                    let mut value_mask = bitvec![u64, Lsb0; 0; <N3<T>>::SIZE];
+                    self.reader
+                        .read_u64_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
+
+                    node_4.data[idx] = InternalData::Node(Box::new(<N3<T>>::new_from_header(
+                        try_from_bitvec(value_mask)?,
+                    )));
+                }
+
+                node_5.data[idx] = InternalData::Node(Box::new(node_4));
+            }
+
+            let root_data = RootData::Node(Box::new(node_5));
+            node5_entries.push((root_key, root_data));
         }
 
-        dbg!(node5s_entry);
+        let root = RootNode {
+            map: HashMap::from_iter(node5_entries),
+            background: root_node_background,
+        };
 
-        todo!()
+        Ok(VDB345 {
+            root,
+            grid_descriptor: grid_descriptor.clone(),
+        })
     }
 
     fn read_internal_node_header<T: Pod, N: Node>(
@@ -532,6 +557,50 @@ impl<R: Read + Seek> VdbReader<R> {
             }
         })
     }
+
+    fn read_tree_data<T: From4LeBytes + std::fmt::Debug + Pod>(
+        &mut self,
+        grid_descriptor: &GridDescriptor,
+        vdb: &mut VDB345<T>,
+    ) -> Result<()> {
+        grid_descriptor.seek_to_blocks(&mut self.reader)?;
+
+        for node_5 in vdb.root.map.values_mut() {
+            let RootData::Node(node_5) = node_5 else { continue; };
+
+            for node_4 in node_5.data.iter_mut() {
+                let InternalData::Node(node_4) = node_4 else { continue; };
+
+                for node_3 in node_4.data.iter_mut() {
+                    let InternalData::Node(node_3) = node_3 else { continue; };
+
+                    let mut value_mask = bitvec![u64, Lsb0; 0; <N3<T>>::SIZE];
+                    self.reader
+                        .read_u64_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
+
+                    if self.header.file_version < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION {
+                        let _origin = read_vec3i(&mut self.reader)?;
+                        let num_buffers = self.reader.read_u8()?;
+                        assert_eq!(num_buffers, 1);
+                    }
+
+                    let data: Vec<T> = self.read_compressed(
+                        &grid_descriptor,
+                        <N3<T>>::SIZE,
+                        value_mask.as_bitslice(),
+                    )?;
+
+                    for idx in 0..data.len() {
+                        if value_mask[idx] {
+                            node_3.data[idx] = LeafData::Value(data[idx]);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 pub trait From4LeBytes {
@@ -615,14 +684,51 @@ impl TryFrom<u8> for NodeMetaData {
     }
 }
 
+trait TryConvertFromBitVec<const LOG2_D: u64> {
+    type Error;
+    fn try_convert(value: BitVec<u64>) -> std::result::Result<Self, Self::Error>
+    where
+        Self: Sized;
+}
+
+impl<const LOG2_D: u64> TryConvertFromBitVec<LOG2_D> for [u64; (1 << (LOG2_D * 3)) / 64] {
+    type Error = ErrorKind;
+
+    fn try_convert(mask: BitVec<u64>) -> Result<Self> {
+        let slice: &[u64] = mask.as_raw_slice();
+        match TryInto::<[u64; (1 << (LOG2_D * 3)) / 64]>::try_into(slice) {
+            Err(_) => Err(ErrorKind::UnexpectedMaskLength),
+            Ok(array) => Ok(array),
+        }
+    }
+}
+
+fn try_from_bitvec<const LOG2_D: u64>(
+    mask: BitVec<u64>,
+) -> Result<[u64; ((1 << (LOG2_D * 3)) / 64) as usize]> {
+    let slice: &[u64] = mask.as_raw_slice();
+    match TryInto::<[u64; ((1 << (LOG2_D * 3)) / 64) as usize]>::try_into(slice) {
+        Err(_) => Err(ErrorKind::UnexpectedMaskLength),
+        Ok(array) => Ok(array),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::io::BufReader;
+    use std::{io::BufReader, thread};
 
     use super::*;
 
     #[test]
     fn test_read_utahteapot() {
+        let builder = thread::Builder::new()
+            .name("set_voxel_test".into())
+            .stack_size(80 * 1024 * 1024); // @HACK to increase stack size of this test
+        let handler = builder.spawn(|| test_read_utahteapot_inner()).unwrap();
+        handler.join().unwrap_or_else(|_| panic!("Test Failed"));
+    }
+
+    fn test_read_utahteapot_inner() {
         let f = std::fs::File::open("assets/utahteapot.vdb").unwrap();
         let b = BufReader::new(f);
 
@@ -631,6 +737,8 @@ mod tests {
         dbg!(&vdb_reader.grid_descriptors);
 
         let vdb = vdb_reader.read_vdb345_grid::<f16>("ls_utahteapot").unwrap();
+        // @TODO: Design an accurate test suite (i.e. check some voxels)
+        dbg!(vdb.get_voxel([156, 1, 2]));
 
         todo!();
     }

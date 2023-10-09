@@ -19,7 +19,7 @@ pub trait Node {
     const TOTAL_SIZE: u64 = 1 << (Self::TOTAL_LOG2_D * 3);
 
     /// Give the bit index for the child node that contains position `p`
-    fn bit_index_from_coords(p: [u32; 3]) -> usize {
+    fn bit_index_from_local_coords(p: [u32; 3]) -> usize {
         // @SPEED: Maybe don't use iterators
         // Relative coordinates of point to nearest node
         let p = p.map(|c| c & ((1 << Self::TOTAL_LOG2_D) - 1));
@@ -28,6 +28,31 @@ pub trait Node {
         // Actual bit_index
         (z | (y << Self::LOG2_D) | (x << ((Self::LOG2_D) << 1))) as usize
     }
+
+    // fn local_coord_from_bit_index(&self, idx: usize) -> [u32; 3] {
+    //     assert!(
+    //         idx < (1 << (3 * Self::LOG2_D)),
+    //         "Index {} out of bounds",
+    //         idx
+    //     );
+
+    //     let x = (idx >> (2 * Self::LOG2_D)) as u32;
+    //     let idx = idx & ((1 << (2 * Self::LOG2_D)) - 1);
+
+    //     let y = (idx >> Self::LOG2_D) as u32;
+    //     let z = (idx & ((1 << Self::LOG2_D) - 1)) as u32;
+
+    //     [x, y, z]
+    // }
+
+    // fn global_coord_from_bit_index(&self, idx: usize) -> [i32; 3] {
+    //     let [mut lx, mut ly, mut lz] = self.local_coord_from_bit_index(idx);
+    //     lx <<= Self::TOTAL_SIZE;
+    //     ly <<= Self::TOTAL_SIZE;
+    //     lz <<= Self::TOTAL_SIZE;
+
+    //     // (local_coord.0.as_ivec3() + self.offset())
+    // }
 
     // fn pretty_print_inner(&self, input: &mut String, offset: usize);
 }
@@ -80,9 +105,22 @@ where
 {
     pub fn new() -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
-            std::array::from_fn(|i| LeafData::Offset(0));
+            std::array::from_fn(|_| LeafData::Offset(0));
         let value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
             [0; ((1 << (LOG2_D * 3)) / 64) as usize];
+        let flags = 0;
+
+        Self {
+            data,
+            value_mask,
+            flags,
+        }
+    }
+
+    pub fn new_from_header(value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize]) -> Self {
+        let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
+            std::array::from_fn(|_| LeafData::Offset(0));
+        [0; ((1 << (LOG2_D * 3)) / 64) as usize];
         let flags = 0;
 
         Self {
@@ -127,6 +165,22 @@ where
         let child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
             [0; ((1 << (LOG2_D * 3)) / 64) as usize];
         let origin = [0; 3];
+
+        Self {
+            data,
+            value_mask,
+            child_mask,
+            origin,
+        }
+    }
+
+    pub fn new_from_header(
+        child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
+        value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
+        origin: [i32; 3],
+    ) -> Self {
+        let data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize] =
+            std::array::from_fn(|_| InternalData::Tile(ValueType::zeroed()));
 
         Self {
             data,
@@ -248,6 +302,13 @@ impl GridDescriptor {
         reader.seek(SeekFrom::Start(self.grid_pos))
     }
 
+    pub(crate) fn seek_to_blocks<R: Read + Seek>(
+        &self,
+        reader: &mut R,
+    ) -> Result<u64, std::io::Error> {
+        reader.seek(SeekFrom::Start(self.block_pos))
+    }
+
     pub fn world_to_u(&self, p: [i32; 3]) -> [u32; 3] {
         p.map(|c| (c + 1000) as u32)
     }
@@ -356,16 +417,13 @@ pub struct ArchiveHeader {
     pub meta_data: Metadata,
 }
 
-type N3 = LeafNode<u64, 3>;
-type N4 = InternalNode<u64, N3, 4>;
-type N5 = InternalNode<u64, N4, 5>;
-type Root345 = RootNode<u64, N5>;
-type VDB345 = VDB<u64, N5>;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    type N3 = LeafNode<u64, 3>;
+    type N4 = InternalNode<u64, N3, 4>;
+    type N5 = InternalNode<u64, N4, 5>;
     #[test]
     fn n345_mask_size_test() {
         let n345_masks: (usize, usize, usize) = {
@@ -397,8 +455,11 @@ mod tests {
 
     #[test]
     fn bit_index_test() {
-        assert_eq!(83, N3::bit_index_from_coords([1, 2, 3]));
-        assert_eq!(3382, N4::bit_index_from_coords([121321, 212123, 3121]));
-        assert_eq!(0, N5::bit_index_from_coords([1, 2, 3]));
+        assert_eq!(83, N3::bit_index_from_local_coords([1, 2, 3]));
+        assert_eq!(
+            3382,
+            N4::bit_index_from_local_coords([121321, 212123, 3121])
+        );
+        assert_eq!(0, N5::bit_index_from_local_coords([1, 2, 3]));
     }
 }

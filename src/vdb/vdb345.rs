@@ -16,9 +16,9 @@ where
     pub fn set_voxel(&mut self, p: [i32; 3], v: ValueType) {
         let p: [u32; 3] = self.grid_descriptor.world_to_u(p);
         let root_key = <Root345<ValueType>>::root_key_from_coords(p);
-        let bit_index_4 = <N5<ValueType>>::bit_index_from_coords(p);
-        let bit_index_3 = <N4<ValueType>>::bit_index_from_coords(p);
-        let bit_index_0 = <N3<ValueType>>::bit_index_from_coords(p);
+        let bit_index_4 = <N5<ValueType>>::bit_index_from_local_coords(p);
+        let bit_index_3 = <N4<ValueType>>::bit_index_from_local_coords(p);
+        let bit_index_0 = <N3<ValueType>>::bit_index_from_local_coords(p);
 
         let root_entry = self
             .root
@@ -66,17 +66,17 @@ where
         match root_data {
             RootData::Tile(value, _) => VdbEndpoint::Root(value),
             RootData::Node(node5) => {
-                let bit_index_4 = <N5<ValueType>>::bit_index_from_coords(p);
+                let bit_index_4 = <N5<ValueType>>::bit_index_from_local_coords(p);
                 let node5_data = &node5.data[bit_index_4];
                 match node5_data {
                     InternalData::Tile(value) => VdbEndpoint::Innr(value, 5),
                     InternalData::Node(node4) => {
-                        let bit_index_3 = <N4<ValueType>>::bit_index_from_coords(p);
+                        let bit_index_3 = <N4<ValueType>>::bit_index_from_local_coords(p);
                         let node4_data = &node4.data[bit_index_3];
                         match node4_data {
                             InternalData::Tile(value) => VdbEndpoint::Innr(value, 4),
                             InternalData::Node(node3) => {
-                                let bit_index_0 = <N3<ValueType>>::bit_index_from_coords(p);
+                                let bit_index_0 = <N3<ValueType>>::bit_index_from_local_coords(p);
                                 let node3_data = &node3.data[bit_index_0];
                                 match node3_data {
                                     LeafData::Offset(offset) => VdbEndpoint::Offs(*offset),
