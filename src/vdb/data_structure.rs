@@ -1,60 +1,65 @@
 use bitflags::bitflags;
 use bitvec::vec::BitVec;
 use bytemuck::Pod;
-use cgmath::Zero;
+use cgmath::Vector3;
 use std::{
     collections::HashMap,
     io::{Read, Seek, SeekFrom},
 };
 
+pub type GlobalCoordinates = Vector3<i32>;
+pub type LocalCoordinates = Vector3<u32>;
+pub type Offset = usize;
+
 pub trait Node {
+    /// LOG2_D of side length -> 3
+    ///
+    /// LOG2_D = 3 => `512 = 8 * 8 * 8` children
     const LOG2_D: u64;
+    /// LOG2_D * 2 (for 2 arbitrary dimensions)
     const LOG2_DD: u64 = Self::LOG2_D * 2;
+    /// Total conceptual LOG2_D node
     const TOTAL_LOG2_D: u64;
+    /// Total conceptual LOG2_D of child node
     const CHILD_TOTAL_LOG2_D: u64 = Self::TOTAL_LOG2_D - Self::LOG2_D;
     const DIM: u64 = 1 << Self::LOG2_D;
-    // Size of this node (i.e. length of data array)
+    /// Size of this node (i.e. length of data array)
     const SIZE: usize = 1 << (Self::LOG2_D * 3);
-    // Total size of node, including child size
+    /// Total conceptual size of node, including child size
     const TOTAL_SIZE: u64 = 1 << (Self::TOTAL_LOG2_D * 3);
 
-    /// Give the bit index for the child node that contains position `p`
-    fn bit_index_from_local_coords(p: [u32; 3]) -> usize {
-        // @SPEED: Maybe don't use iterators
-        // Relative coordinates of point to nearest node
-        let p = p.map(|c| c & ((1 << Self::TOTAL_LOG2_D) - 1));
-        // Relative coordinates of child node
-        let [x, y, z] = p.map(|c| c >> Self::CHILD_TOTAL_LOG2_D);
-        // Actual bit_index
-        (z | (y << Self::LOG2_D) | (x << ((Self::LOG2_D) << 1))) as usize
+    /// Give local coordinates relative to the Node containing `global` position
+    fn global_to_relative(global: GlobalCoordinates) -> LocalCoordinates {
+        global
+            .map(|c| (c & ((1 << Self::TOTAL_LOG2_D) - 1)) as u32)
+            .into()
     }
 
-    // fn local_coord_from_bit_index(&self, idx: usize) -> [u32; 3] {
-    //     assert!(
-    //         idx < (1 << (3 * Self::LOG2_D)),
-    //         "Index {} out of bounds",
-    //         idx
-    //     );
+    /// Give local child coordinates from `relative` positon
+    fn relative_to_child(local: LocalCoordinates) -> LocalCoordinates {
+        local.map(|c| c >> Self::CHILD_TOTAL_LOG2_D)
+    }
 
-    //     let x = (idx >> (2 * Self::LOG2_D)) as u32;
-    //     let idx = idx & ((1 << (2 * Self::LOG2_D)) - 1);
+    /// Give the index for the child node that contains the `global` position ``
+    ///
+    /// This is conceptually equivalent to calling global_to_relative > relative_to_child > child_to_offset
+    fn global_to_offset(global: GlobalCoordinates) -> Offset {
+        // ((( x &(1 < < sLog2X ) -1) > > Child :: sLog2X ) < < Log2YZ ) +
+        // ((( y &(1 < < sLog2Y ) -1) > > Child :: sLog2Y ) < < Log2Z ) +
+        // (( z &(1 < < sLog2Z ) -1) > > Child :: sLog2Z );
 
-    //     let y = (idx >> Self::LOG2_D) as u32;
-    //     let z = (idx & ((1 << Self::LOG2_D) - 1)) as u32;
+        ((((global.x & (1 << Self::TOTAL_LOG2_D) - 1) >> Self::CHILD_TOTAL_LOG2_D)
+            << Self::LOG2_DD)
+            | (((global.y & (1 << Self::TOTAL_LOG2_D) - 1) >> Self::CHILD_TOTAL_LOG2_D)
+                << Self::LOG2_D)
+            | ((global.z & (1 << Self::TOTAL_LOG2_D) - 1) >> Self::CHILD_TOTAL_LOG2_D))
+            as usize
+    }
 
-    //     [x, y, z]
-    // }
-
-    // fn global_coord_from_bit_index(&self, idx: usize) -> [i32; 3] {
-    //     let [mut lx, mut ly, mut lz] = self.local_coord_from_bit_index(idx);
-    //     lx <<= Self::TOTAL_SIZE;
-    //     ly <<= Self::TOTAL_SIZE;
-    //     lz <<= Self::TOTAL_SIZE;
-
-    //     // (local_coord.0.as_ivec3() + self.offset())
-    // }
-
-    // fn pretty_print_inner(&self, input: &mut String, offset: usize);
+    /// Give global origin of Node coordinates from `global` point
+    fn global_to_node(global: GlobalCoordinates) -> GlobalCoordinates {
+        global.map(|c| (c >> Self::TOTAL_LOG2_D) << Self::TOTAL_LOG2_D)
+    }
 }
 
 #[derive(Debug)]
@@ -73,35 +78,15 @@ impl<ValueType, const LOG2_D: u64> Node for LeafNode<ValueType, LOG2_D>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    //   ValueType: std::fmt::Display,
 {
     const LOG2_D: u64 = LOG2_D;
     const TOTAL_LOG2_D: u64 = LOG2_D;
-
-    // fn pretty_print_inner(&self, input: &mut String, offset: usize) {
-    //     let border: String = " ".repeat(offset);
-    //     *input += &format!("{}{}\n", border, type_name::<Self>(),);
-    //     *input += &format!("{}data:\n", border);
-    //     *input += &border.clone();
-    //     for val in &self.data {
-    //         match val {
-    //             LeafData::Offset(_) => {
-    //                 *input += "o";
-    //             }
-    //             LeafData::Value(v) => {
-    //                 *input += &format!("{}", v);
-    //             }
-    //         }
-    //     }
-    //     *input += "\n";
-    // }
 }
 
 impl<ValueType, const LOG2_D: u64> LeafNode<ValueType, LOG2_D>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    //    ValueType: std::fmt::Display,
 {
     pub fn new() -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
@@ -157,14 +142,14 @@ where
     ValueType: Pod,
     ChildType: Node,
 {
-    pub fn new() -> Self {
+    pub fn new(origin: GlobalCoordinates) -> Self {
         let data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize] =
             std::array::from_fn(|_| InternalData::Tile(ValueType::zeroed()));
         let value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
             [0; ((1 << (LOG2_D * 3)) / 64) as usize];
         let child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
             [0; ((1 << (LOG2_D * 3)) / 64) as usize];
-        let origin = [0; 3];
+        let origin = origin.into();
 
         Self {
             data,
@@ -199,28 +184,6 @@ where
 {
     const LOG2_D: u64 = LOG2_D;
     const TOTAL_LOG2_D: u64 = LOG2_D + ChildType::TOTAL_LOG2_D;
-
-    // fn pretty_print_inner(&self, input: &mut String, offset: usize) {
-    //     let border: String = " ".repeat(offset);
-    //     *input += &format!(
-    //         "{}{} {} {}: {}\n",
-    //         border,
-    //         self.origin[0],
-    //         self.origin[1],
-    //         self.origin[2],
-    //         type_name::<Self>(),
-    //     );
-    //     *input += &format!("{}data:\n", border);
-    //     for val in &self.data {
-    //         match val {
-    //             InternalData::Tile(_) => {}
-    //             InternalData::Node(child) => {
-    //                 child.pretty_print_inner(input, offset + 2);
-    //             }
-    //         }
-    //     }
-    //     *input += "\n";
-    // }
 }
 
 #[derive(Debug)]
@@ -232,7 +195,7 @@ pub enum InternalData<ValueType, ChildType> {
 #[derive(Debug)]
 pub struct RootNode<ValueType, ChildType: Node> {
     // @SPEED: Use a custom hash function
-    pub map: HashMap<[u32; 3], RootData<ValueType, ChildType>>,
+    pub map: HashMap<[i32; 3], RootData<ValueType, ChildType>>,
     pub background: ValueType,
 }
 
@@ -251,26 +214,13 @@ where
         let background = ValueType::default();
         Self { map, background }
     }
-
-    // pub fn pretty_print(&self, input: &mut String) {
-    //     for (key, val) in self.map.iter() {
-    //         if let RootData::Node(node) = val {
-    //             *input += &format!(
-    //                 "{} {} {}: {}\n",
-    //                 key[0],
-    //                 key[1],
-    //                 key[2],
-    //                 type_name::<ChildType>()
-    //             );
-    //             node.pretty_print_inner(input, 2);
-    //         }
-    //     }
-    // }
 }
 
 impl<ValueType, ChildType: Node> RootNode<ValueType, ChildType> {
-    pub fn root_key_from_coords(p: [u32; 3]) -> [u32; 3] {
-        p.map(|c| c & !((1 << ChildType::TOTAL_LOG2_D) - 1))
+    pub fn root_key_from_coords(global: GlobalCoordinates) -> [i32; 3] {
+        // @HACK: these 2 might not actually be equivalent
+        // p.map(|c| c & !((1 << ChildType::TOTAL_LOG2_D) - 1)).into()
+        ChildType::global_to_node(global).into()
     }
 }
 
@@ -294,7 +244,6 @@ pub struct GridDescriptor {
     pub end_pos: u64,
     pub compression: Compression,
     pub meta_data: Metadata,
-    pub bbox_min: cgmath::Vector3<i32>,
 }
 
 impl GridDescriptor {
@@ -307,10 +256,6 @@ impl GridDescriptor {
         reader: &mut R,
     ) -> Result<u64, std::io::Error> {
         reader.seek(SeekFrom::Start(self.block_pos))
-    }
-
-    pub fn world_to_u(&self, p: [i32; 3]) -> [u32; 3] {
-        p.map(|c| (c + 1000) as u32)
     }
 }
 
@@ -329,7 +274,6 @@ where
             end_pos: 0,
             compression: Compression::NONE,
             meta_data: Default::default(),
-            bbox_min: cgmath::Vector3::zero(),
         };
 
         Self {
@@ -424,6 +368,23 @@ mod tests {
     type N3 = LeafNode<u64, 3>;
     type N4 = InternalNode<u64, N3, 4>;
     type N5 = InternalNode<u64, N4, 5>;
+
+    #[test]
+    fn global_to_node_test() {
+        assert_eq!(
+            Vector3::from([-8, 0, 0]),
+            N3::global_to_node([-1, 0, 0].into())
+        );
+        assert_eq!(
+            Vector3::from([-256, 2304, 0]),
+            N4::global_to_node([-142, 2431, 102].into())
+        );
+        assert_eq!(
+            Vector3::from([-4096, 0, -45056]),
+            N5::global_to_node([-1, 0, -42141].into())
+        );
+    }
+
     #[test]
     fn n345_mask_size_test() {
         let n345_masks: (usize, usize, usize) = {
@@ -455,11 +416,9 @@ mod tests {
 
     #[test]
     fn bit_index_test() {
-        assert_eq!(83, N3::bit_index_from_local_coords([1, 2, 3]));
-        assert_eq!(
-            3382,
-            N4::bit_index_from_local_coords([121321, 212123, 3121])
-        );
-        assert_eq!(0, N5::bit_index_from_local_coords([1, 2, 3]));
+        assert_eq!(0, N3::global_to_offset([0, 0, 0].into()));
+        assert_eq!(83, N3::global_to_offset([1, 2, 3].into()));
+        assert_eq!(3382, N4::global_to_offset([121321, 212123, 3121].into()));
+        assert_eq!(0, N5::global_to_offset([1, 2, 3].into()));
     }
 }

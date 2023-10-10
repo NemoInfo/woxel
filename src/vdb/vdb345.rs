@@ -13,44 +13,40 @@ where
     ValueType: Pod,
 {
     /// Sets the value `v` of a single voxel in the VDB at point `p`.
-    pub fn set_voxel(&mut self, p: [i32; 3], v: ValueType) {
-        let p: [u32; 3] = self.grid_descriptor.world_to_u(p);
+    pub fn set_voxel(&mut self, p: GlobalCoordinates, v: ValueType) {
         let root_key = <Root345<ValueType>>::root_key_from_coords(p);
-        let bit_index_4 = <N5<ValueType>>::bit_index_from_local_coords(p);
-        let bit_index_3 = <N4<ValueType>>::bit_index_from_local_coords(p);
-        let bit_index_0 = <N3<ValueType>>::bit_index_from_local_coords(p);
+        let bit_index_4 = <N5<ValueType>>::global_to_offset(p);
+        let bit_index_3 = <N4<ValueType>>::global_to_offset(p);
+        let bit_index_0 = <N3<ValueType>>::global_to_offset(p);
 
         let root_entry = self
             .root
             .map
             .entry(root_key)
-            .or_insert_with(|| RootData::Node(Box::new(<N5<ValueType>>::new())));
-        // @TODO: This makes the origin of every node to be 0 0 0
+            .or_insert_with(|| RootData::Node(Box::new(<N5<ValueType>>::new(p))));
 
         if let RootData::Tile(..) = root_entry {
-            *root_entry = RootData::Node(Box::new(<N5<ValueType>>::new()));
+            *root_entry = RootData::Node(Box::new(<N5<ValueType>>::new(p)));
         }
 
-        if let RootData::Node(node_5) = root_entry {
-            let node_5_entry = &mut node_5.data[bit_index_4];
-            if let InternalData::Tile(..) = node_5_entry {
-                *node_5_entry = InternalData::Node(Box::new(<N4<ValueType>>::new()));
+        let RootData::Node(node_5) = root_entry  else { unreachable!() };
+
+        let node_5_entry = &mut node_5.data[bit_index_4];
+        if let InternalData::Tile(..) = node_5_entry {
+            *node_5_entry = InternalData::Node(Box::new(<N4<ValueType>>::new(p)));
+        }
+
+        node_5.child_mask[bit_index_4 >> 6] |= 1 << (bit_index_4 & (64 - 1));
+        if let InternalData::Node(node_4) = node_5_entry {
+            let node_4_entry = &mut node_4.data[bit_index_3];
+            if let InternalData::Tile(..) = node_4_entry {
+                *node_4_entry = InternalData::Node(Box::new(<N3<ValueType>>::new()));
             }
 
-            node_5.child_mask[bit_index_4 >> 6] |= 1 << (bit_index_4 & (64 - 1));
-            if let InternalData::Node(node_4) = node_5_entry {
-                let node_4_entry = &mut node_4.data[bit_index_3];
-                if let InternalData::Tile(..) = node_4_entry {
-                    *node_4_entry = InternalData::Node(Box::new(<N3<ValueType>>::new()));
-                }
-
-                node_4.child_mask[bit_index_3 >> 6] |= 1 << (bit_index_3 & (64 - 1));
-                if let InternalData::Node(node_3) = node_4_entry {
-                    node_3.value_mask[bit_index_0 >> 6] |= 1 << (bit_index_0 & (64 - 1));
-                    node_3.data[bit_index_0] = LeafData::Value(v);
-                }
-            } else {
-                unreachable!();
+            node_4.child_mask[bit_index_3 >> 6] |= 1 << (bit_index_3 & (64 - 1));
+            if let InternalData::Node(node_3) = node_4_entry {
+                node_3.value_mask[bit_index_0 >> 6] |= 1 << (bit_index_0 & (64 - 1));
+                node_3.data[bit_index_0] = LeafData::Value(v);
             }
         } else {
             unreachable!();
@@ -58,35 +54,34 @@ where
     }
 
     /// Returns the value of a single voxel in the VDB at point `p`.
-    pub fn get_voxel(&self, p: [i32; 3]) -> VdbEndpoint<&ValueType> {
-        let p: [u32; 3] = self.grid_descriptor.world_to_u(p);
+    pub fn get_voxel(&self, p: GlobalCoordinates) -> VdbEndpoint<&ValueType> {
         let root_key = <Root345<ValueType>>::root_key_from_coords(p);
 
         let Some(root_data) = self.root.map.get(&root_key) else { return VdbEndpoint::Bkgr(&self.root.background) };
-        match root_data {
-            RootData::Tile(value, _) => VdbEndpoint::Root(value),
-            RootData::Node(node5) => {
-                let bit_index_4 = <N5<ValueType>>::bit_index_from_local_coords(p);
-                let node5_data = &node5.data[bit_index_4];
-                match node5_data {
-                    InternalData::Tile(value) => VdbEndpoint::Innr(value, 5),
-                    InternalData::Node(node4) => {
-                        let bit_index_3 = <N4<ValueType>>::bit_index_from_local_coords(p);
-                        let node4_data = &node4.data[bit_index_3];
-                        match node4_data {
-                            InternalData::Tile(value) => VdbEndpoint::Innr(value, 4),
-                            InternalData::Node(node3) => {
-                                let bit_index_0 = <N3<ValueType>>::bit_index_from_local_coords(p);
-                                let node3_data = &node3.data[bit_index_0];
-                                match node3_data {
-                                    LeafData::Offset(offset) => VdbEndpoint::Offs(*offset),
-                                    LeafData::Value(value) => VdbEndpoint::Leaf(value),
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        let RootData::Node(node5) = root_data else {
+            let RootData::Tile(value, _) = root_data else { unreachable!() };
+            return VdbEndpoint::Root(value);
+        };
+
+        let bit_index_4 = <N5<ValueType>>::global_to_offset(p);
+        let node5_data = &node5.data[bit_index_4];
+        let InternalData::Node(node4) = node5_data else {
+            let InternalData::Tile(value) = node5_data else { unreachable!() };
+            return VdbEndpoint::Innr(value, 5);
+        };
+
+        let bit_index_3 = <N4<ValueType>>::global_to_offset(p);
+        let node4_data = &node4.data[bit_index_3];
+        let InternalData::Node(node3) = node4_data else {
+            let InternalData::Tile(value) = node4_data else { unreachable!() };
+            return VdbEndpoint::Innr(value, 4);
+        };
+
+        let bit_index_0 = <N3<ValueType>>::global_to_offset(p);
+        let node3_data = &node3.data[bit_index_0];
+        match node3_data {
+            LeafData::Offset(offset) => VdbEndpoint::Offs(*offset),
+            LeafData::Value(value) => VdbEndpoint::Leaf(value),
         }
     }
 }
@@ -107,10 +102,10 @@ mod tests {
                 let mut vdb = <VDB345<u8>>::new();
                 let points = [[0, 0, 0], [123, 78, 3], [34, 123, 46], [102, 79, 28]];
                 for (i, &point) in points.iter().enumerate() {
-                    vdb.set_voxel(point, i as u8);
+                    vdb.set_voxel(point.into(), i as u8);
                 }
                 for (i, &point) in points.iter().enumerate() {
-                    let VdbEndpoint::Leaf(&res) = vdb.get_voxel(point) else { panic!("Leaf value not found at point {point:?}"); };
+                    let VdbEndpoint::Leaf(&res) = vdb.get_voxel(point.into()) else { panic!("Leaf value not found at point {point:?}"); };
                     assert_eq!(i as u8, res);
                 }
             })

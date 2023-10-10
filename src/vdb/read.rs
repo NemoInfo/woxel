@@ -8,7 +8,7 @@ use bitvec::prelude::*;
 use blosc_src::blosc_cbuffer_sizes;
 use bytemuck::{bytes_of_mut, cast_slice_mut, Pod, Zeroable};
 use byteorder::{LittleEndian, ReadBytesExt};
-use cgmath::{Vector3, Zero};
+use cgmath::Vector3;
 use half::f16;
 use log::{trace, warn};
 
@@ -43,8 +43,6 @@ pub enum ErrorKind {
     InvalidCompression(u32),
     #[error("Invaild grid name {0}")]
     InvalidGridName(String),
-    #[error("File bbox min not provided")]
-    FileBboxMinNotFound,
     #[error("Invalid node metadata entry (u8)")]
     InvalidNodeMetadata(u8),
     #[error("Unsupported Blosc format")]
@@ -196,7 +194,6 @@ impl<R: Read + Seek> VdbReader<R> {
                 end_pos,
                 compression: header.compression,
                 meta_data: Default::default(),
-                bbox_min: Vector3::zero(),
             };
 
             if header.file_version >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION {
@@ -204,10 +201,6 @@ impl<R: Read + Seek> VdbReader<R> {
             }
 
             grid_descriptor.meta_data = Self::read_metadata(reader)?;
-
-            let Some(MetadataValue::Vec3i(bbox_min)) = grid_descriptor.meta_data.0.get("file_bbox_min") else { return Err(ErrorKind::FileBboxMinNotFound) };
-
-            grid_descriptor.bbox_min = *bbox_min;
 
             assert!(
                 grid_descriptors
@@ -298,9 +291,8 @@ impl<R: Read + Seek> VdbReader<R> {
 
         // Iterate Node5 tiles
         for _ in 0..number_of_tiles {
-            let origin: [i32; 3] = read_vec3i(&mut self.reader)?.into();
-            let uorigin: [u32; 3] = grid_descriptor.world_to_u(origin);
-            let root_key = <Root345<T>>::root_key_from_coords(uorigin);
+            let origin = read_vec3i(&mut self.reader)?;
+            let root_key = <Root345<T>>::root_key_from_coords(origin);
 
             let value_bytes = self.reader.read_u32::<LittleEndian>()?;
             let value = T::from_4_le_bytes(value_bytes.to_le_bytes());
@@ -311,28 +303,32 @@ impl<R: Read + Seek> VdbReader<R> {
         }
 
         // Iterate Node5 Children
+        let mut count = 0;
         for _ in 0..number_of_node5s {
-            let origin: [i32; 3] = read_vec3i(&mut self.reader)?.into();
-            let uorigin: [u32; 3] = grid_descriptor.world_to_u(origin);
-            let root_key = <Root345<T>>::root_key_from_coords(uorigin);
+            count += 1;
+            let origin = read_vec3i(&mut self.reader)?;
+            let root_key = <Root345<T>>::root_key_from_coords(origin);
 
             let node_5_header = self.read_internal_node_header::<T, N5<T>>(&grid_descriptor)?;
 
             let mut node_5 = <N5<T>>::new_from_header(
                 try_from_bitvec(node_5_header.child_mask.clone())?,
                 try_from_bitvec(node_5_header.value_mask.clone())?,
-                origin,
+                origin.into(),
             );
 
             for idx in node_5_header.child_mask.iter_ones() {
+                count += 1;
                 let node_4_header = self.read_internal_node_header::<T, N4<T>>(&grid_descriptor)?;
                 let mut node_4 = <N4<T>>::new_from_header(
                     try_from_bitvec(node_4_header.child_mask.clone())?,
                     try_from_bitvec(node_4_header.value_mask.clone())?,
+                    // @TODO: Actua;;y compute coords
                     [0; 3],
                 );
 
                 for idx in node_4_header.child_mask.iter_ones() {
+                    count += 1;
                     let mut value_mask = bitvec![u64, Lsb0; 0; <N3<T>>::SIZE];
                     self.reader
                         .read_u64_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
@@ -348,6 +344,8 @@ impl<R: Read + Seek> VdbReader<R> {
             let root_data = RootData::Node(Box::new(node_5));
             node5_entries.push((root_key, root_data));
         }
+
+        dbg!(count);
 
         let root = RootNode {
             map: HashMap::from_iter(node5_entries),
@@ -724,22 +722,66 @@ mod tests {
         let builder = thread::Builder::new()
             .name("set_voxel_test".into())
             .stack_size(80 * 1024 * 1024); // @HACK to increase stack size of this test
-        let handler = builder.spawn(|| test_read_utahteapot_inner()).unwrap();
+        let handler = builder.spawn(|| test_read_vdb("utahteapot")).unwrap();
         handler.join().unwrap_or_else(|_| panic!("Test Failed"));
     }
 
-    fn test_read_utahteapot_inner() {
-        let f = std::fs::File::open("assets/utahteapot.vdb").unwrap();
+    #[test]
+    fn test_read_cube() {
+        let builder = thread::Builder::new()
+            .name("set_voxel_test".into())
+            .stack_size(80 * 1024 * 1024); // @HACK to increase stack size of this test
+        let handler = builder.spawn(|| test_read_vdb("cube")).unwrap();
+        handler.join().unwrap_or_else(|_| panic!("Test Failed"));
+    }
+
+    #[test]
+    fn test_read_icosahedron() {
+        let builder = thread::Builder::new()
+            .name("set_voxel_test".into())
+            .stack_size(80 * 1024 * 1024); // @HACK to increase stack size of this test
+        let handler = builder.spawn(|| test_read_vdb("icosahedron")).unwrap();
+        handler.join().unwrap_or_else(|_| panic!("Test Failed"));
+    }
+
+    fn test_read_vdb(name: &'static str) {
+        let f = std::fs::File::open(format!("assets/{name}.vdb")).unwrap();
         let b = BufReader::new(f);
 
         let mut vdb_reader = VdbReader::new(b).unwrap();
         dbg!(&vdb_reader.header);
         dbg!(&vdb_reader.grid_descriptors);
 
-        let vdb = vdb_reader.read_vdb345_grid::<f16>("ls_utahteapot").unwrap();
-        // @TODO: Design an accurate test suite (i.e. check some voxels)
-        dbg!(vdb.get_voxel([156, 1, 2]));
+        let grid_name = format!("ls_{name}");
 
-        todo!();
+        let vdb = vdb_reader.read_vdb345_grid::<f16>(&grid_name).unwrap();
+
+        let mut count_voxels = 0;
+        for (root_key, root_child) in &vdb.root.map {
+            let RootData::Node(node5) = root_child else { continue };
+            println!("root_key: {root_key:?}");
+            for node5_child in &node5.data {
+                let InternalData::Node(node4) = node5_child else { continue };
+                for node4_child in &node4.data {
+                    let InternalData::Node(node3) = node4_child else { continue };
+                    for node3_child in &node3.data {
+                        let LeafData::Value(_) = node3_child else { continue };
+                        count_voxels += 1;
+                    }
+                }
+            }
+        }
+
+        assert_eq!(
+            *vdb_reader
+                .grid_descriptors
+                .get(&grid_name)
+                .unwrap()
+                .meta_data
+                .0
+                .get("file_voxel_count")
+                .unwrap(),
+            MetadataValue::I64(count_voxels)
+        );
     }
 }

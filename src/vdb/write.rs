@@ -264,7 +264,7 @@ mod tests {
         let mut vdb = <VDB345<f32>>::new();
         let points = [[0, 0, 0], [123, 78, 3], [34, 123, 46], [102, 79, 28]];
         for (i, &point) in points.iter().enumerate() {
-            vdb.set_voxel(point, i as f32);
+            vdb.set_voxel(point.into(), i as f32);
         }
 
         let mut b: BytesMut = BytesMut::new();
