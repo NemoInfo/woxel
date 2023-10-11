@@ -6,19 +6,18 @@ use std::{
 
 use bitvec::prelude::*;
 use blosc_src::blosc_cbuffer_sizes;
-use bytemuck::{bytes_of_mut, cast_slice_mut, Pod, Zeroable};
+use bytemuck::{bytes_of_mut, cast_slice_mut, Zeroable};
 use byteorder::{LittleEndian, ReadBytesExt};
 use cgmath::Vector3;
 use half::f16;
 use log::{trace, warn};
 
 use crate::vdb::{
-    Compression, InternalData, LeafData, Node, NodeHeader, NodeMetaData, Root345, RootData,
-    RootNode, N3, N4, N5,
+    transform::Map, ArchiveHeader, Compression, GridDescriptor, InternalData, LeafData, Metadata,
+    MetadataValue, Node, NodeHeader, NodeMetaData, Root345, RootData, RootNode, N3, N4, N5, VDB345,
 };
 
-use super::transform::Map;
-use super::{ArchiveHeader, GridDescriptor, Metadata, MetadataValue, VDB345};
+use super::VdbValueType;
 
 type Result<T> = std::result::Result<T, ErrorKind>;
 
@@ -121,10 +120,7 @@ impl<R: Read + Seek> VdbReader<R> {
         })
     }
 
-    pub fn read_vdb345_grid<T: From4LeBytes + std::fmt::Debug + Pod>(
-        &mut self,
-        name: &str,
-    ) -> Result<VDB345<T>> {
+    pub fn read_vdb345_grid<T: VdbValueType>(&mut self, name: &str) -> Result<VDB345<T>> {
         let grid_descriptor = self.grid_descriptors.get(name).cloned();
         let grid_descriptor =
             grid_descriptor.ok_or_else(|| ErrorKind::InvalidGridName(name.to_owned()))?;
@@ -271,7 +267,7 @@ impl<R: Read + Seek> VdbReader<R> {
         Ok(meta_data)
     }
 
-    fn read_tree_topology<T: From4LeBytes + std::fmt::Debug + Pod>(
+    fn read_tree_topology<T: VdbValueType>(
         &mut self,
         grid_descriptor: &GridDescriptor,
     ) -> Result<VDB345<T>> {
@@ -358,7 +354,7 @@ impl<R: Read + Seek> VdbReader<R> {
         })
     }
 
-    fn read_internal_node_header<T: Pod, N: Node>(
+    fn read_internal_node_header<T: VdbValueType, N: Node>(
         &mut self,
         grid_descriptor: &GridDescriptor,
     ) -> Result<NodeHeader<T>> {
@@ -385,7 +381,7 @@ impl<R: Read + Seek> VdbReader<R> {
         })
     }
 
-    fn read_compressed<T: Pod>(
+    fn read_compressed<T: VdbValueType>(
         &mut self,
         grid_descriptor: &GridDescriptor,
         size: usize,
@@ -430,16 +426,43 @@ impl<R: Read + Seek> VdbReader<R> {
             size
         };
 
-        let data: Vec<T> = if grid_descriptor.meta_data.is_half_float()
-            && std::any::TypeId::of::<T>() == std::any::TypeId::of::<f32>()
-        {
-            let data = self.read_compressed_data::<f16>(grid_descriptor, count)?;
-            bytemuck::cast_vec(data.into_iter().map(f16::to_f32).collect::<Vec<f32>>())
-        } else if !grid_descriptor.meta_data.is_half_float() {
-            let data = self.read_compressed_data::<f32>(grid_descriptor, count)?;
-            bytemuck::cast_vec(data.into_iter().map(f16::from_f32).collect::<Vec<_>>())
+        let expected = std::any::TypeId::of::<T>();
+        let f16_type = std::any::TypeId::of::<f16>();
+        let f32_type = std::any::TypeId::of::<f32>();
+
+        let real = if grid_descriptor.meta_data.is_half_float() {
+            f16_type
         } else {
-            self.read_compressed_data(grid_descriptor, count)?
+            f32_type
+        };
+
+        let data: Vec<T> = match (expected, real) {
+            (e, r) if e == r => self.read_compressed_data(grid_descriptor, count)?,
+            (e, r) if e == f16_type && r == f32_type => {
+                let data = self.read_compressed_data::<f32>(grid_descriptor, count)?;
+                bytemuck::cast_vec(data.into_iter().map(f16::from_f32).collect::<Vec<_>>())
+            }
+            (e, r) if e == f32_type && r == f16_type => {
+                let data = self.read_compressed_data::<f16>(grid_descriptor, count)?;
+                bytemuck::cast_vec(data.into_iter().map(f16::to_f32).collect::<Vec<f32>>())
+            }
+            (_, r) if r == f16_type => {
+                let data = self.read_compressed_data::<f16>(grid_descriptor, count)?;
+                bytemuck::cast_vec(
+                    data.into_iter()
+                        .map(|c| T::from_f16_bites(c))
+                        .collect::<Vec<_>>(),
+                )
+            }
+            (_, r) if r == f32_type => {
+                let data = self.read_compressed_data::<f32>(grid_descriptor, count)?;
+                bytemuck::cast_vec(
+                    data.into_iter()
+                        .map(|c| T::from_f32_bites(c))
+                        .collect::<Vec<_>>(),
+                )
+            }
+            _ => unreachable!(),
         };
 
         Ok(
@@ -470,7 +493,7 @@ impl<R: Read + Seek> VdbReader<R> {
         )
     }
 
-    fn read_compressed_data<T: Pod>(
+    fn read_compressed_data<T: VdbValueType>(
         &mut self,
         grid_descriptor: &GridDescriptor,
         count: usize,
@@ -556,7 +579,7 @@ impl<R: Read + Seek> VdbReader<R> {
         })
     }
 
-    fn read_tree_data<T: From4LeBytes + std::fmt::Debug + Pod>(
+    fn read_tree_data<T: VdbValueType>(
         &mut self,
         grid_descriptor: &GridDescriptor,
         vdb: &mut VDB345<T>,
@@ -603,40 +626,25 @@ impl<R: Read + Seek> VdbReader<R> {
 
 pub trait From4LeBytes {
     fn from_4_le_bytes(array: [u8; 4]) -> Self;
-}
 
-impl From4LeBytes for f32 {
-    fn from_4_le_bytes(array: [u8; 4]) -> Self {
-        f32::from_le_bytes(array)
+    fn from_f16_bites(f: f16) -> Self
+    where
+        Self: Sized,
+    {
+        let [b1, b0] = f.to_le_bytes();
+
+        Self::from_4_le_bytes([0, 0, b0, b1])
+    }
+
+    fn from_f32_bites(f: f32) -> Self
+    where
+        Self: Sized,
+    {
+        let bytes = f.to_le_bytes();
+
+        Self::from_4_le_bytes(bytes)
     }
 }
-
-impl From4LeBytes for f16 {
-    fn from_4_le_bytes(array: [u8; 4]) -> Self {
-        f16::from_le_bytes([array[0], array[1]])
-    }
-}
-
-impl From4LeBytes for u8 {
-    fn from_4_le_bytes(array: [u8; 4]) -> Self {
-        u8::from_le_bytes([array[0]])
-    }
-}
-
-impl From4LeBytes for u16 {
-    fn from_4_le_bytes(array: [u8; 4]) -> Self {
-        u16::from_le_bytes([array[0], array[1]])
-    }
-}
-
-impl TryFrom<u32> for Compression {
-    type Error = ErrorKind;
-
-    fn try_from(v: u32) -> Result<Compression> {
-        Self::from_bits(v).ok_or(ErrorKind::InvalidCompression(v))
-    }
-}
-
 fn read_len_string<R: Read + Seek>(reader: &mut R) -> Result<String> {
     let len = reader.read_u32::<LittleEndian>()? as usize;
     read_string(reader, len)
@@ -754,7 +762,7 @@ mod tests {
 
         let grid_name = format!("ls_{name}");
 
-        let vdb = vdb_reader.read_vdb345_grid::<f16>(&grid_name).unwrap();
+        let vdb = vdb_reader.read_vdb345_grid::<u128>(&grid_name).unwrap();
 
         let mut count_voxels = 0;
         for (root_key, root_child) in &vdb.root.map {
@@ -783,5 +791,49 @@ mod tests {
                 .unwrap(),
             MetadataValue::I64(count_voxels)
         );
+    }
+}
+
+impl From4LeBytes for f32 {
+    fn from_4_le_bytes(array: [u8; 4]) -> Self {
+        f32::from_le_bytes(array)
+    }
+}
+
+impl From4LeBytes for f16 {
+    fn from_4_le_bytes(array: [u8; 4]) -> Self {
+        f16::from_le_bytes([array[0], array[1]])
+    }
+}
+
+impl From4LeBytes for u8 {
+    fn from_4_le_bytes(array: [u8; 4]) -> Self {
+        u8::from_le_bytes([array[0]])
+    }
+}
+
+impl From4LeBytes for u16 {
+    fn from_4_le_bytes(array: [u8; 4]) -> Self {
+        u16::from_le_bytes([array[0], array[1]])
+    }
+}
+
+impl From4LeBytes for u128 {
+    fn from_4_le_bytes(array: [u8; 4]) -> Self {
+        u32::from_le_bytes(array) as u128
+    }
+}
+
+impl From4LeBytes for u64 {
+    fn from_4_le_bytes(array: [u8; 4]) -> Self {
+        u32::from_le_bytes(array) as u64
+    }
+}
+
+impl TryFrom<u32> for Compression {
+    type Error = ErrorKind;
+
+    fn try_from(v: u32) -> Result<Compression> {
+        Self::from_bits(v).ok_or(ErrorKind::InvalidCompression(v))
     }
 }

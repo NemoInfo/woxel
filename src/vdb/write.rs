@@ -2,10 +2,12 @@ use core::fmt;
 use std::{fmt::Write, mem::size_of};
 
 use bytes::{self, BufMut, BytesMut};
+use cgmath::num_traits::ToBytes;
+use half::f16;
 
-use super::{InternalData, LeafData, RootData, N3, N4, N5, VDB345};
+use super::{InternalData, LeafData, RootData, VdbValueType, N3, N4, N5, VDB345};
 
-pub fn write_vdb<T: std::fmt::Display + Copy + CopyBytesToU32>(
+pub fn write_vdb<T: VdbValueType>(
     b: &mut BytesMut,
     vdb: &VDB345<T>,
     mat: [[f64; 4]; 4],
@@ -38,7 +40,7 @@ pub fn write_vdb<T: std::fmt::Display + Copy + CopyBytesToU32>(
     Ok(())
 }
 
-fn write_grid<T: std::fmt::Display + Copy + CopyBytesToU32>(
+fn write_grid<T: VdbValueType>(
     b: &mut BytesMut,
     vdb: &VDB345<T>,
     mat: [[f64; 4]; 4],
@@ -69,10 +71,7 @@ fn write_grid<T: std::fmt::Display + Copy + CopyBytesToU32>(
     Ok(())
 }
 
-fn write_tree<T: std::fmt::Display + Copy + CopyBytesToU32>(
-    b: &mut BytesMut,
-    vdb: &VDB345<T>,
-) -> fmt::Result {
+fn write_tree<T: VdbValueType>(b: &mut BytesMut, vdb: &VDB345<T>) -> fmt::Result {
     // Magic
     b.put_u32_le(1);
 
@@ -119,7 +118,7 @@ fn write_tree<T: std::fmt::Display + Copy + CopyBytesToU32>(
     Ok(())
 }
 
-fn write_node5_header<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, node5: &Box<N5<T>>) {
+fn write_node5_header<T: VdbValueType>(b: &mut BytesMut, node5: &Box<N5<T>>) {
     b.put_i32(node5.origin[0]);
     b.put_i32(node5.origin[1]);
     b.put_i32(node5.origin[2]);
@@ -144,7 +143,7 @@ fn write_node5_header<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, n
     }
 }
 
-fn write_node4_header<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, node4: &Box<N4<T>>) {
+fn write_node4_header<T: VdbValueType>(b: &mut BytesMut, node4: &Box<N4<T>>) {
     for word in node4.child_mask {
         b.put_u64(word);
     }
@@ -165,13 +164,13 @@ fn write_node4_header<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, n
     }
 }
 
-fn write_node3_header<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, node3: &Box<N3<T>>) {
+fn write_node3_header<T: VdbValueType>(b: &mut BytesMut, node3: &Box<N3<T>>) {
     for word in node3.value_mask {
         b.put_u64(word);
     }
 }
 
-fn write_node3_data<T: std::fmt::Display + CopyBytesToU32>(b: &mut BytesMut, node3: &Box<N3<T>>) {
+fn write_node3_data<T: VdbValueType>(b: &mut BytesMut, node3: &Box<N3<T>>) {
     for word in node3.value_mask {
         b.put_u64(word);
     }
@@ -242,6 +241,35 @@ pub trait CopyBytesToU32 {
 impl CopyBytesToU32 for f32 {
     fn copy_bytes_to_u32(&self) -> u32 {
         u32::from_be_bytes(self.to_be_bytes())
+    }
+}
+
+impl CopyBytesToU32 for u64 {
+    fn copy_bytes_to_u32(&self) -> u32 {
+        let bytes = self.to_le_bytes();
+        u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+    }
+}
+
+impl CopyBytesToU32 for u8 {
+    fn copy_bytes_to_u32(&self) -> u32 {
+        let byte = self.to_le_bytes();
+        u32::from_le_bytes([0, 0, 0, byte[0]])
+    }
+}
+
+impl CopyBytesToU32 for f16 {
+    fn copy_bytes_to_u32(&self) -> u32 {
+        let bytes = self.to_le_bytes();
+        u32::from_le_bytes([0, 0, bytes[0], bytes[1]])
+    }
+}
+
+impl CopyBytesToU32 for u128 {
+    fn copy_bytes_to_u32(&self) -> u32 {
+        // HACK: This loses data, but we should never write a vdb file with u128 data
+        let bytes = (*self as u64).to_le_bytes();
+        u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
     }
 }
 

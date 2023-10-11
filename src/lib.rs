@@ -1,12 +1,13 @@
 #![feature(generic_const_exprs)]
 #![feature(raw_ref_op)]
-use std::io::BufReader;
+#![feature(trait_alias)]
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 mod vdb;
 
+use std::io::BufReader;
 use winit::dpi::{PhysicalSize, Size};
 use winit::event_loop::EventLoop;
 use winit::window::WindowBuilder;
@@ -26,7 +27,7 @@ const DEFAULT_SIZE: Size = Size::Physical(PhysicalSize::new(1600, 900));
 pub async fn run() {
     let f = std::fs::File::open("assets/utahteapot.vdb").unwrap();
     let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
-    let vdb = vdb_reader.read_vdb345_grid::<f32>("ls_utahteapot").unwrap();
+    let _vdb = vdb_reader.read_vdb345_grid::<f32>("ls_utahteapot").unwrap();
 
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {

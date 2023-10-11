@@ -1,11 +1,12 @@
 use bitflags::bitflags;
 use bitvec::vec::BitVec;
-use bytemuck::Pod;
 use cgmath::Vector3;
 use std::{
     collections::HashMap,
     io::{Read, Seek, SeekFrom},
 };
+
+use super::VdbValueType;
 
 pub type GlobalCoordinates = Vector3<i32>;
 pub type LocalCoordinates = Vector3<u32>;
@@ -67,7 +68,7 @@ pub struct LeafNode<ValueType, const LOG2_D: u64>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    //    ValueType: std::fmt::Display,
+    ValueType: VdbValueType,
 {
     pub data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize],
     pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
@@ -78,6 +79,7 @@ impl<ValueType, const LOG2_D: u64> Node for LeafNode<ValueType, LOG2_D>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
+    ValueType: VdbValueType,
 {
     const LOG2_D: u64 = LOG2_D;
     const TOTAL_LOG2_D: u64 = LOG2_D;
@@ -87,6 +89,7 @@ impl<ValueType, const LOG2_D: u64> LeafNode<ValueType, LOG2_D>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
+    ValueType: VdbValueType,
 {
     pub fn new() -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
@@ -139,7 +142,7 @@ impl<ValueType, ChildType, const LOG2_D: u64> InternalNode<ValueType, ChildType,
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    ValueType: Pod,
+    ValueType: VdbValueType,
     ChildType: Node,
 {
     pub fn new(origin: GlobalCoordinates) -> Self {
@@ -180,6 +183,7 @@ impl<ValueType, ChildType, const LOG2_D: u64> Node for InternalNode<ValueType, C
 where
     [(); (1 << (LOG2_D * 3)) as usize]:,
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
+    ValueType: VdbValueType,
     ChildType: Node,
 {
     const LOG2_D: u64 = LOG2_D;
@@ -193,7 +197,10 @@ pub enum InternalData<ValueType, ChildType> {
 }
 
 #[derive(Debug)]
-pub struct RootNode<ValueType, ChildType: Node> {
+pub struct RootNode<ValueType, ChildType: Node>
+where
+    ValueType: VdbValueType,
+{
     // @SPEED: Use a custom hash function
     pub map: HashMap<[i32; 3], RootData<ValueType, ChildType>>,
     pub background: ValueType,
@@ -207,16 +214,19 @@ pub enum RootData<ValueType, ChildType> {
 
 impl<ValueType, ChildType: Node> RootNode<ValueType, ChildType>
 where
-    ValueType: Default,
+    ValueType: VdbValueType,
 {
     fn new() -> Self {
         let map = HashMap::new();
-        let background = ValueType::default();
+        let background = ValueType::zeroed();
         Self { map, background }
     }
 }
 
-impl<ValueType, ChildType: Node> RootNode<ValueType, ChildType> {
+impl<ValueType, ChildType: Node> RootNode<ValueType, ChildType>
+where
+    ValueType: VdbValueType,
+{
     pub fn root_key_from_coords(global: GlobalCoordinates) -> [i32; 3] {
         // @HACK: these 2 might not actually be equivalent
         // p.map(|c| c & !((1 << ChildType::TOTAL_LOG2_D) - 1)).into()
@@ -225,7 +235,10 @@ impl<ValueType, ChildType: Node> RootNode<ValueType, ChildType> {
 }
 
 #[derive(Debug)]
-pub struct VDB<ValueType, ChildType: Node> {
+pub struct VDB<ValueType, ChildType: Node>
+where
+    ValueType: VdbValueType,
+{
     pub root: RootNode<ValueType, ChildType>,
     pub grid_descriptor: GridDescriptor,
 }
@@ -261,7 +274,7 @@ impl GridDescriptor {
 
 impl<ValueType, ChildType: Node> VDB<ValueType, ChildType>
 where
-    ValueType: Default,
+    ValueType: VdbValueType,
 {
     pub fn new() -> Self {
         let root = <RootNode<ValueType, ChildType>>::new();
