@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::vdb::data_structure::*;
 
 use super::VdbValueType;
@@ -14,7 +16,7 @@ pub type N5Cube<ValueType> = [[[ValueType; 1 << 5]; 1 << 5]; 1 << 5];
 
 impl<'a, ValueType> VDB345<ValueType>
 where
-    ValueType: VdbValueType,
+    ValueType: VdbValueType + Debug,
 {
     /// Sets the value `v` of a single voxel in the VDB at point `p`.
     pub fn set_voxel(&mut self, p: GlobalCoordinates, v: ValueType) {
@@ -109,6 +111,11 @@ where
         let n3_atlas_size = optimal_3_factors(n3s.len());
         println!("{n3_atlas_size:?}");
 
+        let n5_atlas =
+            pack_cubes::<ValueType, 32>(n5s.iter().map(|x| x.0).collect(), n5_atlas_size);
+
+        // println!("{:?}", n5_atlas);
+
         todo!();
     }
 
@@ -200,6 +207,29 @@ where
     }
 }
 
+fn pack_cubes<V: VdbValueType + Debug, const DIM: usize>(
+    cubes: Vec<[[[V; DIM]; DIM]; DIM]>,
+    [x, y, z]: [usize; 3],
+) -> Vec<Vec<Vec<V>>> {
+    let mut atlas = vec![vec![vec![V::zeroed(); DIM * z]; DIM * y]; DIM * x];
+
+    for (idx, cube) in cubes.iter().enumerate() {
+        let cx = (idx % x) * DIM;
+        let cy = ((idx / x) % y) * DIM;
+        let cz = (idx / (x * y)) * DIM;
+
+        for i in 0..DIM {
+            for j in 0..DIM {
+                for k in 0..DIM {
+                    atlas[cx + i][cy + j][cz + k] = cube[i][j][k];
+                }
+            }
+        }
+    }
+
+    atlas
+}
+
 #[cfg(test)]
 mod tests {
     use std::thread;
@@ -232,7 +262,7 @@ mod tests {
 
 fn factorize_3(n: usize) -> Vec<[usize; 3]> {
     let mut factors = vec![];
-    let sqrt_n = (n as f64).sqrt() as usize;
+    let sqrt_n = (n as f64).sqrt() as usize + 1;
 
     for i in 1..sqrt_n {
         if n % i != 0 {
@@ -260,7 +290,5 @@ fn optimal_3_factors(n: usize) -> [usize; 3] {
             optimal = factors
         }
     }
-    optimal.reverse();
-
     optimal
 }
