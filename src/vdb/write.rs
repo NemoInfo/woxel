@@ -86,15 +86,21 @@ fn write_tree<T: VdbValueType>(b: &mut BytesMut, vdb: &VDB345<T>) -> fmt::Result
 
     // Iterate node 5s
     for (_, node5_data) in &vdb.root.map {
-        let RootData::Node(node5) = node5_data else { continue; };
+        let RootData::Node(node5) = node5_data else {
+            continue;
+        };
         write_node5_header(b, node5);
 
         for node4_data in &node5.data {
-            let InternalData::Node(node4) = node4_data else { continue; };
+            let InternalData::Node(node4) = node4_data else {
+                continue;
+            };
 
             write_node4_header(b, node4);
             for node3_data in &node4.data {
-                let InternalData::Node(node3) = node3_data else { continue; };
+                let InternalData::Node(node3) = node3_data else {
+                    continue;
+                };
 
                 write_node3_header(b, node3);
             }
@@ -102,13 +108,19 @@ fn write_tree<T: VdbValueType>(b: &mut BytesMut, vdb: &VDB345<T>) -> fmt::Result
     }
 
     for (_, node5_data) in &vdb.root.map {
-        let RootData::Node(node5) = node5_data else { continue; };
+        let RootData::Node(node5) = node5_data else {
+            continue;
+        };
 
         for node4_data in &node5.data {
-            let InternalData::Node(node4) = node4_data else { continue; };
+            let InternalData::Node(node4) = node4_data else {
+                continue;
+            };
 
             for node3_data in &node4.data {
-                let InternalData::Node(node3) = node3_data else { continue; };
+                let InternalData::Node(node3) = node3_data else {
+                    continue;
+                };
 
                 write_node3_data(b, node3);
             }
@@ -238,16 +250,16 @@ pub trait CopyBytesToU32 {
     fn copy_bytes_to_u32(&self) -> u32;
 }
 
-impl CopyBytesToU32 for f32 {
+impl CopyBytesToU32 for f16 {
     fn copy_bytes_to_u32(&self) -> u32 {
-        u32::from_be_bytes(self.to_be_bytes())
+        let bytes = self.to_le_bytes();
+        u32::from_le_bytes([0, 0, bytes[0], bytes[1]])
     }
 }
 
-impl CopyBytesToU32 for u64 {
+impl CopyBytesToU32 for f32 {
     fn copy_bytes_to_u32(&self) -> u32 {
-        let bytes = self.to_le_bytes();
-        u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+        u32::from_be_bytes(self.to_be_bytes())
     }
 }
 
@@ -258,10 +270,23 @@ impl CopyBytesToU32 for u8 {
     }
 }
 
-impl CopyBytesToU32 for f16 {
+impl CopyBytesToU32 for u16 {
+    fn copy_bytes_to_u32(&self) -> u32 {
+        let byte = self.to_le_bytes();
+        u32::from_le_bytes([0, 0, byte[0], byte[1]])
+    }
+}
+
+impl CopyBytesToU32 for u32 {
+    fn copy_bytes_to_u32(&self) -> u32 {
+        *self
+    }
+}
+
+impl CopyBytesToU32 for u64 {
     fn copy_bytes_to_u32(&self) -> u32 {
         let bytes = self.to_le_bytes();
-        u32::from_le_bytes([0, 0, bytes[0], bytes[1]])
+        u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
     }
 }
 

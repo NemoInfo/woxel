@@ -131,7 +131,7 @@ impl<R: Read + Seek> VdbReader<R> {
         }
         let _ = Self::read_metadata(&mut self.reader)?;
 
-        // @TODO: Make a Grid struct to store the descriptot and the VDB
+        // @TODO: Make a Grid struct to store the descriptors and the VDB
         let _transform = Self::read_transform(&mut self.reader)?;
 
         let mut vdb = self.read_tree_topology::<T>(&grid_descriptor)?;
@@ -340,8 +340,6 @@ impl<R: Read + Seek> VdbReader<R> {
             let root_data = RootData::Node(Box::new(node_5));
             node5_entries.push((root_key, root_data));
         }
-
-        dbg!(count);
 
         let root = RootNode {
             map: HashMap::from_iter(node5_entries),
@@ -587,13 +585,19 @@ impl<R: Read + Seek> VdbReader<R> {
         grid_descriptor.seek_to_blocks(&mut self.reader)?;
 
         for node_5 in vdb.root.map.values_mut() {
-            let RootData::Node(node_5) = node_5 else { continue; };
+            let RootData::Node(node_5) = node_5 else {
+                continue;
+            };
 
             for node_4 in node_5.data.iter_mut() {
-                let InternalData::Node(node_4) = node_4 else { continue; };
+                let InternalData::Node(node_4) = node_4 else {
+                    continue;
+                };
 
                 for node_3 in node_4.data.iter_mut() {
-                    let InternalData::Node(node_3) = node_3 else { continue; };
+                    let InternalData::Node(node_3) = node_3 else {
+                        continue;
+                    };
 
                     let mut value_mask = bitvec![u64, Lsb0; 0; <N3<T>>::SIZE];
                     self.reader
@@ -762,18 +766,26 @@ mod tests {
 
         let grid_name = format!("ls_{name}");
 
-        let vdb = vdb_reader.read_vdb345_grid::<u128>(&grid_name).unwrap();
+        let vdb = vdb_reader.read_vdb345_grid::<u32>(&grid_name).unwrap();
 
         let mut count_voxels = 0;
         for (root_key, root_child) in &vdb.root.map {
-            let RootData::Node(node5) = root_child else { continue };
+            let RootData::Node(node5) = root_child else {
+                continue;
+            };
             println!("root_key: {root_key:?}");
             for node5_child in &node5.data {
-                let InternalData::Node(node4) = node5_child else { continue };
+                let InternalData::Node(node4) = node5_child else {
+                    continue;
+                };
                 for node4_child in &node4.data {
-                    let InternalData::Node(node3) = node4_child else { continue };
+                    let InternalData::Node(node3) = node4_child else {
+                        continue;
+                    };
                     for node3_child in &node3.data {
-                        let LeafData::Value(_) = node3_child else { continue };
+                        let LeafData::Value(_) = node3_child else {
+                            continue;
+                        };
                         count_voxels += 1;
                     }
                 }
@@ -794,15 +806,15 @@ mod tests {
     }
 }
 
-impl From4LeBytes for f32 {
-    fn from_4_le_bytes(array: [u8; 4]) -> Self {
-        f32::from_le_bytes(array)
-    }
-}
-
 impl From4LeBytes for f16 {
     fn from_4_le_bytes(array: [u8; 4]) -> Self {
         f16::from_le_bytes([array[0], array[1]])
+    }
+}
+
+impl From4LeBytes for f32 {
+    fn from_4_le_bytes(array: [u8; 4]) -> Self {
+        f32::from_le_bytes(array)
     }
 }
 
@@ -818,15 +830,21 @@ impl From4LeBytes for u16 {
     }
 }
 
-impl From4LeBytes for u128 {
+impl From4LeBytes for u32 {
     fn from_4_le_bytes(array: [u8; 4]) -> Self {
-        u32::from_le_bytes(array) as u128
+        u32::from_le_bytes(array)
     }
 }
 
 impl From4LeBytes for u64 {
     fn from_4_le_bytes(array: [u8; 4]) -> Self {
         u32::from_le_bytes(array) as u64
+    }
+}
+
+impl From4LeBytes for u128 {
+    fn from_4_le_bytes(array: [u8; 4]) -> Self {
+        u32::from_le_bytes(array) as u128
     }
 }
 

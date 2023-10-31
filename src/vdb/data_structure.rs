@@ -16,6 +16,7 @@ pub trait Node {
     /// LOG2_D of side length -> 3
     ///
     /// LOG2_D = 3 => `512 = 8 * 8 * 8` children
+    // TODO: Maybe these should be u32
     const LOG2_D: u64;
     /// LOG2_D * 2 (for 2 arbitrary dimensions)
     const LOG2_DD: u64 = Self::LOG2_D * 2;
@@ -60,6 +61,15 @@ pub trait Node {
     /// Give global origin of Node coordinates from `global` point
     fn global_to_node(global: GlobalCoordinates) -> GlobalCoordinates {
         global.map(|c| (c >> Self::TOTAL_LOG2_D) << Self::TOTAL_LOG2_D)
+    }
+
+    fn offset_to_relative(offset: Offset) -> LocalCoordinates {
+        (
+            offset as u32 >> Self::LOG2_DD,
+            (offset as u32 >> Self::LOG2_D) & (Self::DIM as u32 - 1),
+            offset as u32 & (Self::DIM as u32 - 1),
+        )
+            .into()
     }
 }
 
