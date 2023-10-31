@@ -46,7 +46,7 @@ impl ComputeOutputTexture {
 
     fn create_texture_view(&self, texture: &Texture) -> TextureView {
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("Compute Texture Output"),
+            label: Some("Compute Texture View"),
             format: Some(wgpu::TextureFormat::Rgba8Unorm),
             base_mip_level: 0,
             mip_level_count: Some(1),

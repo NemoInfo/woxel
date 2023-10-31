@@ -10,8 +10,8 @@ use crate::{
 };
 
 use super::gpu_types::{
-    ComputeOutputTexture, FragmentTexture, GpuPrimitive, GpuQuad, GpuTexture, RayUniform,
-    StateUniform, GPU_QUAD,
+    ComputeOutputTexture, FragmentTexture, GpuPrimitive, GpuQuad, GpuTexture, NodeAtlas,
+    RayUniform, StateUniform, GPU_QUAD,
 };
 
 pub struct FrameDescriptor {
@@ -76,6 +76,13 @@ impl FrameDescriptor {
         size: [u32; 2],
     ) -> (Texture, BindGroup, BindGroupLayout) {
         ComputeOutputTexture::new(size).bind(device)
+    }
+
+    pub fn create_compute_vdb_atlas_texture_binding(
+        device: &Device,
+        size: [u32; 3],
+    ) -> (Texture, BindGroup, BindGroupLayout) {
+        NodeAtlas::new(size).bind(device)
     }
 
     pub fn create_fragment_texture_binding(

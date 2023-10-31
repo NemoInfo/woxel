@@ -139,6 +139,9 @@ impl WgpuContext {
         let (compute_texture, compute_texture_bind_group, compute_texture_bind_group_layout) =
             FrameDescriptor::create_compute_output_texture_binding(&self.device, self.size.into());
 
+        let (atlas5_texture, atlas5_texture_bind_group, atlas5_texture_bind_group_layout) =
+            FrameDescriptor::create_compute_vdb_atlas_texture_binding(&self.device, [3, 3, 3]);
+
         let (fragment_texture, fragment_texture_bind_group, fragment_texture_bind_group_layout) =
             FrameDescriptor::create_fragment_texture_binding(&self.device, self.size.into());
 

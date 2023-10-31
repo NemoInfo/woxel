@@ -30,3 +30,6 @@ pub use state::StateUniform;
 
 mod texture;
 pub use texture::*;
+
+mod atlas;
+pub use atlas::*;

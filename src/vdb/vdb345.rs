@@ -99,71 +99,101 @@ where
         }
     }
 
+    pub fn atlas(&self) -> () {
+        let (n5s, n4s, n3s) = self.node_vecs();
+
+        let n5_atlas_size = optimal_3_factors(n5s.len());
+        println!("{n5_atlas_size:?}");
+        let n4_atlas_size = optimal_3_factors(n4s.len());
+        println!("{n4_atlas_size:?}");
+        let n3_atlas_size = optimal_3_factors(n3s.len());
+        println!("{n3_atlas_size:?}");
+
+        todo!();
+    }
+
     pub fn node_vecs(
         &self,
     ) -> (
-        Vec<N5Cube<ValueType>>,
-        Vec<N4Cube<ValueType>>,
-        Vec<N3Cube<ValueType>>,
+        Vec<(
+            N5Cube<ValueType>,
+            [u64; 1 << (5 * 3 - 6)],
+            [u64; 1 << (5 * 3 - 6)],
+        )>,
+        Vec<(
+            N4Cube<ValueType>,
+            [u64; 1 << (4 * 3 - 6)],
+            [u64; 1 << (4 * 3 - 6)],
+        )>,
+        Vec<(N3Cube<ValueType>, [u64; 1 << (3 * 3 - 6)])>,
     ) {
         let (mut n5s, mut n4s, mut n3s) = (vec![], vec![], vec![]);
 
         for (origin, root_data) in self.root.map.iter() {
             let RootData::Node(node5) = root_data else {
+                // TODO: handle node5 tiles
                 continue;
             };
 
             let mut n5_cube: N5Cube<ValueType> = [[[self.root.background; 1 << 5]; 1 << 5]; 1 << 5];
 
             for (offset, node5_data) in node5.data.iter().enumerate() {
-                let InternalData::Node(node4) = node5_data else {
-                    continue;
-                };
                 let (x, y, z): (usize, usize, usize) = <N5<ValueType>>::offset_to_relative(offset)
                     .map(|c| c as usize)
                     .into();
+
+                let InternalData::Node(node4) = node5_data else {
+                    let &InternalData::Tile(node4_tile) = node5_data else {
+                        unreachable!();
+                    };
+                    n5_cube[x][y][z] = node4_tile;
+                    continue;
+                };
 
                 let mut n4_cube: N4Cube<ValueType> =
                     [[[self.root.background; 1 << 4]; 1 << 4]; 1 << 4];
 
                 for (offset, node4_data) in node4.data.iter().enumerate() {
-                    let InternalData::Node(node3) = node4_data else {
-                        continue;
-                    };
                     let (x, y, z): (usize, usize, usize) =
                         <N4<ValueType>>::offset_to_relative(offset)
                             .map(|c| c as usize)
                             .into();
+                    let InternalData::Node(node3) = node4_data else {
+                        let &InternalData::Tile(node3_tile) = node4_data else {
+                            unreachable!();
+                        };
+                        n4_cube[x][y][z] = node3_tile;
+                        continue;
+                    };
 
                     let mut n3_cube: N3Cube<ValueType> =
                         [[[self.root.background; 1 << 3]; 1 << 3]; 1 << 3];
 
                     for (offset, node3_data) in node3.data.iter().enumerate() {
-                        let &LeafData::Value(voxel) = node3_data else {
-                            continue;
-                            // TODO: If SDF we should encode this somehow
-                            // We can just store this same as a voxel and send the masks in a separate binding to the gpu
-                        };
-
                         let (x, y, z): (usize, usize, usize) =
                             <N3<ValueType>>::offset_to_relative(offset)
                                 .map(|c| c as usize)
                                 .into();
 
-                        n3_cube[x][y][z] = voxel;
+                        n3_cube[x][y][z] = match node3_data {
+                            &LeafData::Value(value) => value,
+                            &LeafData::Offset(offset) => {
+                                ValueType::from_4_le_bytes((offset as u32).to_le_bytes())
+                            }
+                        };
                     }
 
                     let n3_idx = n3s.len() as u32;
-                    n3s.push(n3_cube);
+                    n3s.push((n3_cube, node3.value_mask));
                     n4_cube[x][y][z] = ValueType::from_4_le_bytes(n3_idx.to_le_bytes());
                 }
 
                 let n4_idx = n4s.len() as u32;
-                n4s.push(n4_cube);
+                n4s.push((n4_cube, node4.child_mask, node4.value_mask));
                 n5_cube[x][y][z] = ValueType::from_4_le_bytes(n4_idx.to_le_bytes());
             }
 
-            n5s.push(n5_cube);
+            n5s.push((n5_cube, node5.child_mask, node5.value_mask));
         }
 
         (n5s, n4s, n3s)
@@ -198,4 +228,39 @@ mod tests {
             .unwrap();
         handler.join().unwrap_or_else(|_| panic!("Test Failed"));
     }
+}
+
+fn factorize_3(n: usize) -> Vec<[usize; 3]> {
+    let mut factors = vec![];
+    let sqrt_n = (n as f64).sqrt() as usize;
+
+    for i in 1..sqrt_n {
+        if n % i != 0 {
+            continue;
+        }
+        for j in 1..sqrt_n {
+            if n % (i * j) != 0 {
+                continue;
+            }
+            let k = n / (i * j);
+            factors.push([i, j, k])
+        }
+    }
+
+    factors
+}
+
+fn optimal_3_factors(n: usize) -> [usize; 3] {
+    let mut optimal = [1, 1, n];
+
+    for factors in factorize_3(n) {
+        if factors.iter().max().unwrap() - factors.iter().min().unwrap()
+            < optimal.iter().max().unwrap() - optimal.iter().min().unwrap()
+        {
+            optimal = factors
+        }
+    }
+    optimal.reverse();
+
+    optimal
 }
