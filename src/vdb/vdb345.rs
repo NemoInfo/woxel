@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use cgmath::Vector3;
 
 use crate::vdb::data_structure::*;
 
@@ -14,9 +14,13 @@ pub type N3Cube<ValueType> = [[[ValueType; 1 << 3]; 1 << 3]; 1 << 3];
 pub type N4Cube<ValueType> = [[[ValueType; 1 << 4]; 1 << 4]; 1 << 4];
 pub type N5Cube<ValueType> = [[[ValueType; 1 << 5]; 1 << 5]; 1 << 5];
 
+const N5DIM: usize = <N5<u32>>::DIM as usize;
+const N4DIM: usize = <N4<u32>>::DIM as usize;
+const N3DIM: usize = <N3<u32>>::DIM as usize;
+
 impl<'a, ValueType> VDB345<ValueType>
 where
-    ValueType: VdbValueType + Debug,
+    ValueType: VdbValueType,
 {
     /// Sets the value `v` of a single voxel in the VDB at point `p`.
     pub fn set_voxel(&mut self, p: GlobalCoordinates, v: ValueType) {
@@ -101,133 +105,160 @@ where
         }
     }
 
-    pub fn atlas(&self) -> () {
-        let (n5s, n4s, n3s) = self.node_vecs();
+    pub fn masks(&self) -> [Vec<u32>; 5] {
+        let [count_n5, count_n4, count_n3] = self.count_nodes();
+        let mut n5_kids = vec![0; count_n5 * (N5DIM * N5DIM * N5DIM) / 32];
+        let mut n5_vals = vec![0; count_n5 * (N5DIM * N5DIM * N5DIM) / 32];
+        let mut n4_kids = vec![0; count_n4 * (N4DIM * N4DIM * N4DIM) / 32];
+        let mut n4_vals = vec![0; count_n4 * (N4DIM * N4DIM * N4DIM) / 32];
+        let mut n3_vals = vec![0; count_n3 * (N3DIM * N3DIM * N3DIM) / 32];
 
-        let n5_atlas_size = optimal_3_factors(n5s.len());
-        println!("{n5_atlas_size:?}");
-        let n4_atlas_size = optimal_3_factors(n4s.len());
-        println!("{n4_atlas_size:?}");
-        let n3_atlas_size = optimal_3_factors(n3s.len());
-        println!("{n3_atlas_size:?}");
+        for (_origin, root_data) in self.root.map.iter() {
+            let RootData::Node(node5) = root_data else {
+                continue;
+            };
 
-        let n5_atlas =
-            pack_cubes::<ValueType, 32>(n5s.iter().map(|x| x.0).collect(), n5_atlas_size);
+            for node5_data in node5.data.iter() {
+                let InternalData::Node(node4) = node5_data else {
+                    continue;
+                };
 
-        // println!("{:?}", n5_atlas);
+                for node4_data in node4.data.iter() {
+                    let InternalData::Node(node3) = node4_data else {
+                        continue;
+                    };
 
-        todo!();
+                    n3_vals.append(&mut vec32_from_vec64(node3.value_mask.to_vec()));
+                }
+
+                n4_vals.append(&mut vec32_from_vec64(node4.value_mask.to_vec()));
+                n4_kids.append(&mut vec32_from_vec64(node4.child_mask.to_vec()));
+            }
+
+            n5_vals.append(&mut vec32_from_vec64(node5.value_mask.to_vec()));
+            n5_kids.append(&mut vec32_from_vec64(node5.child_mask.to_vec()));
+        }
+
+        [n5_kids, n5_vals, n4_kids, n4_vals, n3_vals]
     }
 
-    pub fn node_vecs(
-        &self,
-    ) -> (
-        Vec<(
-            N5Cube<ValueType>,
-            [u64; 1 << (5 * 3 - 6)],
-            [u64; 1 << (5 * 3 - 6)],
-        )>,
-        Vec<(
-            N4Cube<ValueType>,
-            [u64; 1 << (4 * 3 - 6)],
-            [u64; 1 << (4 * 3 - 6)],
-        )>,
-        Vec<(N3Cube<ValueType>, [u64; 1 << (3 * 3 - 6)])>,
-    ) {
-        let (mut n5s, mut n4s, mut n3s) = (vec![], vec![], vec![]);
+    pub fn atlas(&self) -> [Vec<Vec<Vec<ValueType>>>; 3] {
+        let [count_n5, count_n4, count_n3] = self.count_nodes();
+        let mut n5_atlas = vec![vec![vec![ValueType::zeroed(); N5DIM]; N5DIM]; N5DIM * count_n5];
+        let mut n4_atlas = vec![vec![vec![ValueType::zeroed(); N4DIM]; N4DIM]; N4DIM * count_n4];
+        let mut n3_atlas = vec![vec![vec![ValueType::zeroed(); N3DIM]; N3DIM]; N3DIM * count_n3];
 
-        for (origin, root_data) in self.root.map.iter() {
+        let mut n5_idx: usize = 0;
+        let mut n4_idx: usize = 0;
+        let mut n3_idx: usize = 0;
+
+        for (_origin, root_data) in self.root.map.iter() {
             let RootData::Node(node5) = root_data else {
                 // TODO: handle node5 tiles
                 continue;
             };
-
-            let mut n5_cube: N5Cube<ValueType> = [[[self.root.background; 1 << 5]; 1 << 5]; 1 << 5];
+            let n5_atlas_origin: Vector3<usize> = [n5_idx * N5DIM, 0, 0].into();
 
             for (offset, node5_data) in node5.data.iter().enumerate() {
-                let (x, y, z): (usize, usize, usize) = <N5<ValueType>>::offset_to_relative(offset)
+                let n5_data_rel: Vector3<usize> = <N5<ValueType>>::offset_to_relative(offset)
                     .map(|c| c as usize)
                     .into();
+
+                let n5_atlas_data_pos = n5_atlas_origin + n5_data_rel;
 
                 let InternalData::Node(node4) = node5_data else {
                     let &InternalData::Tile(node4_tile) = node5_data else {
                         unreachable!();
                     };
-                    n5_cube[x][y][z] = node4_tile;
+                    n5_atlas[n5_atlas_data_pos.x][n5_atlas_data_pos.y][n5_atlas_data_pos.z] =
+                        node4_tile;
                     continue;
                 };
-
-                let mut n4_cube: N4Cube<ValueType> =
-                    [[[self.root.background; 1 << 4]; 1 << 4]; 1 << 4];
+                let n4_atlas_origin: Vector3<usize> = [n4_idx * N4DIM, 0, 0].into();
 
                 for (offset, node4_data) in node4.data.iter().enumerate() {
-                    let (x, y, z): (usize, usize, usize) =
-                        <N4<ValueType>>::offset_to_relative(offset)
-                            .map(|c| c as usize)
-                            .into();
+                    let n4_data_rel: Vector3<usize> = <N4<ValueType>>::offset_to_relative(offset)
+                        .map(|c| c as usize)
+                        .into();
+
+                    let n4_atlas_data_pos = n4_atlas_origin + n4_data_rel;
+
                     let InternalData::Node(node3) = node4_data else {
                         let &InternalData::Tile(node3_tile) = node4_data else {
                             unreachable!();
                         };
-                        n4_cube[x][y][z] = node3_tile;
+                        n4_atlas[n4_atlas_data_pos.x][n4_atlas_data_pos.y][n4_atlas_data_pos.z] =
+                            node3_tile;
                         continue;
                     };
-
-                    let mut n3_cube: N3Cube<ValueType> =
-                        [[[self.root.background; 1 << 3]; 1 << 3]; 1 << 3];
+                    let n3_atlas_origin: Vector3<usize> = [n3_idx * N3DIM, 0, 0].into();
 
                     for (offset, node3_data) in node3.data.iter().enumerate() {
-                        let (x, y, z): (usize, usize, usize) =
+                        let n3_data_rel: Vector3<usize> =
                             <N3<ValueType>>::offset_to_relative(offset)
                                 .map(|c| c as usize)
                                 .into();
 
-                        n3_cube[x][y][z] = match node3_data {
-                            &LeafData::Value(value) => value,
-                            &LeafData::Offset(offset) => {
-                                ValueType::from_4_le_bytes((offset as u32).to_le_bytes())
-                            }
-                        };
+                        let n3_atlas_data_pos = n3_atlas_origin + n3_data_rel;
+
+                        n3_atlas[n3_atlas_data_pos.x][n3_atlas_data_pos.y][n3_atlas_data_pos.z] =
+                            match node3_data {
+                                &LeafData::Value(value) => value,
+                                &LeafData::Offset(offset) => {
+                                    ValueType::from_4_le_bytes((offset as u32).to_le_bytes())
+                                }
+                            };
                     }
-
-                    let n3_idx = n3s.len() as u32;
-                    n3s.push((n3_cube, node3.value_mask));
-                    n4_cube[x][y][z] = ValueType::from_4_le_bytes(n3_idx.to_le_bytes());
+                    n4_atlas[n4_atlas_data_pos.x][n4_atlas_data_pos.y][n4_atlas_data_pos.z] =
+                        ValueType::from_4_le_bytes((n3_idx as u32).to_le_bytes());
+                    // HACK: Handle if cast to u32 overflows !!
+                    n3_idx += 1;
                 }
-
-                let n4_idx = n4s.len() as u32;
-                n4s.push((n4_cube, node4.child_mask, node4.value_mask));
-                n5_cube[x][y][z] = ValueType::from_4_le_bytes(n4_idx.to_le_bytes());
+                n5_atlas[n5_atlas_data_pos.x][n5_atlas_data_pos.y][n5_atlas_data_pos.z] =
+                    ValueType::from_4_le_bytes((n4_idx as u32).to_le_bytes());
+                // HACK: Handle if cast to u32 overflows !!
+                n4_idx += 1;
             }
 
-            n5s.push((n5_cube, node5.child_mask, node5.value_mask));
+            n5_idx += 1;
         }
 
-        (n5s, n4s, n3s)
+        [n5_atlas, n4_atlas, n3_atlas]
+    }
+
+    pub fn count_nodes(&self) -> [usize; 3] {
+        let mut count: [usize; 3] = [0, 0, 0];
+        for (_, root_data) in self.root.map.iter() {
+            let RootData::Node(node5) = root_data else {
+                continue;
+            };
+            count[0] += 1;
+            for node5_data in node5.data.iter() {
+                let InternalData::Node(node4) = node5_data else {
+                    continue;
+                };
+                count[1] += 1;
+                for node4_data in node4.data.iter() {
+                    let InternalData::Node(_) = node4_data else {
+                        continue;
+                    };
+                    count[2] += 1;
+                }
+            }
+        }
+        count
     }
 }
 
-fn pack_cubes<V: VdbValueType + Debug, const DIM: usize>(
-    cubes: Vec<[[[V; DIM]; DIM]; DIM]>,
-    [x, y, z]: [usize; 3],
-) -> Vec<Vec<Vec<V>>> {
-    let mut atlas = vec![vec![vec![V::zeroed(); DIM * z]; DIM * y]; DIM * x];
+fn vec32_from_vec64(vec: Vec<u64>) -> Vec<u32> {
+    let mut result = vec![];
 
-    for (idx, cube) in cubes.iter().enumerate() {
-        let cx = (idx % x) * DIM;
-        let cy = ((idx / x) % y) * DIM;
-        let cz = (idx / (x * y)) * DIM;
-
-        for i in 0..DIM {
-            for j in 0..DIM {
-                for k in 0..DIM {
-                    atlas[cx + i][cy + j][cz + k] = cube[i][j][k];
-                }
-            }
-        }
+    for num in vec {
+        result.push((num >> 32) as u32); // Extract the first byte
+        result.push(num as u32); // Extract the second byte
     }
 
-    atlas
+    result
 }
 
 #[cfg(test)]
@@ -258,37 +289,4 @@ mod tests {
             .unwrap();
         handler.join().unwrap_or_else(|_| panic!("Test Failed"));
     }
-}
-
-fn factorize_3(n: usize) -> Vec<[usize; 3]> {
-    let mut factors = vec![];
-    let sqrt_n = (n as f64).sqrt() as usize + 1;
-
-    for i in 1..sqrt_n {
-        if n % i != 0 {
-            continue;
-        }
-        for j in 1..sqrt_n {
-            if n % (i * j) != 0 {
-                continue;
-            }
-            let k = n / (i * j);
-            factors.push([i, j, k])
-        }
-    }
-
-    factors
-}
-
-fn optimal_3_factors(n: usize) -> [usize; 3] {
-    let mut optimal = [1, 1, n];
-
-    for factors in factorize_3(n) {
-        if factors.iter().max().unwrap() - factors.iter().min().unwrap()
-            < optimal.iter().max().unwrap() - optimal.iter().min().unwrap()
-        {
-            optimal = factors
-        }
-    }
-    optimal
 }

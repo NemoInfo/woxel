@@ -1,5 +1,7 @@
+use std::fmt::Debug;
+
 use bytemuck::Pod;
-pub trait VdbValueType = From4LeBytes + Pod + Copy + CopyBytesToU32;
+pub trait VdbValueType = From4LeBytes + Pod + Copy + CopyBytesToU32 + Debug;
 
 mod data_structure;
 pub use data_structure::*;

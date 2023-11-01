@@ -299,9 +299,7 @@ impl<R: Read + Seek> VdbReader<R> {
         }
 
         // Iterate Node5 Children
-        let mut count = 0;
         for _ in 0..number_of_node5s {
-            count += 1;
             let origin = read_vec3i(&mut self.reader)?;
             let root_key = <Root345<T>>::root_key_from_coords(origin);
 
@@ -314,17 +312,15 @@ impl<R: Read + Seek> VdbReader<R> {
             );
 
             for idx in node_5_header.child_mask.iter_ones() {
-                count += 1;
                 let node_4_header = self.read_internal_node_header::<T, N4<T>>(&grid_descriptor)?;
                 let mut node_4 = <N4<T>>::new_from_header(
                     try_from_bitvec(node_4_header.child_mask.clone())?,
                     try_from_bitvec(node_4_header.value_mask.clone())?,
-                    // @TODO: Actua;;y compute coords
+                    // @TODO: Actually compute coords
                     [0; 3],
                 );
 
                 for idx in node_4_header.child_mask.iter_ones() {
-                    count += 1;
                     let mut value_mask = bitvec![u64, Lsb0; 0; <N3<T>>::SIZE];
                     self.reader
                         .read_u64_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;

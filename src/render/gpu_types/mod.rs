@@ -33,3 +33,6 @@ pub use texture::*;
 
 mod atlas;
 pub use atlas::*;
+
+mod mask;
+pub use mask::*;
