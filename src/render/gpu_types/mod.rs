@@ -13,17 +13,14 @@ pub trait GpuPrimitive {
     fn desc<'a>() -> VertexBufferLayout<'a>;
 }
 
-mod camera;
-pub use camera::CameraUniform;
+mod compute_state;
+pub use compute_state::ComputeState;
 
 mod vertex;
 pub use vertex::GpuVertex;
 
 mod quad;
 pub use quad::{GpuQuad, GPU_QUAD};
-
-mod ray;
-pub use ray::RayUniform;
 
 mod state;
 pub use state::StateUniform;

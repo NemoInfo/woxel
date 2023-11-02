@@ -1,34 +1,37 @@
-struct CameraUniform {
+struct Camera {
     view_proj: mat4x4<f32>,
     camera_to_world: mat4x4<f32>,
     eye: vec3<f32>,
 };
-@group(0) @binding(0)
-var<uniform> camera: CameraUniform;
 
-struct RayUniform {
+struct Ray {
     u: vec4<f32>,
     mv: vec4<f32>,
     wp: vec4<f32>,
 };
-@group(1) @binding(0)
-var<uniform> r: RayUniform;
 
-@group(2) @binding(0)
+struct State {
+    camera: Camera,
+    ray: Ray,
+};
+@group(0) @binding(0)
+var<uniform> s: State;
+
+@group(1) @binding(0)
 var texture: texture_storage_2d<rgba8unorm, write>;
 
-@group(3) @binding(0)
-var node5s: texture_3d<f32>;
-@group(3) @binding(1)
-var node4s: texture_3d<f32>;
-@group(3) @binding(2)
-var node3s: texture_3d<f32>;
+@group(2) @binding(0)
+var node5s: texture_3d<u32>;
+@group(2) @binding(1)
+var node4s: texture_3d<u32>;
+@group(2) @binding(2)
+var node3s: texture_3d<u32>;
 
 @compute @workgroup_size(8,4)
 fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var p = vec2<f32>(global_id.xy) + vec2(0.001);
-    var ray_dir = normalize((p.x * r.u + p.y * r.mv + r.wp).xyz);
-    var color = vec4(cast_ray(camera.eye, ray_dir),1.0);
+    var ray_dir = normalize((p.x * s.ray.u + p.y * s.ray.mv + s.ray.wp).xyz);
+    var color = vec4(cast_ray(s.camera.eye, ray_dir),1.0);
     var val = textureLoad(node5s, vec3<i32>(0, 0, 0), 0);
     // We got this from the VDB!!
     //  Shader madness incoming

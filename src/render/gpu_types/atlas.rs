@@ -1,4 +1,4 @@
-use wgpu::{BindGroup, BindGroupLayout, Device, Sampler, Texture, TextureView};
+use wgpu::{BindGroup, BindGroupLayout, Device, Texture, TextureView};
 
 pub struct NodeAtlas {
     size5: [u32; 3],
@@ -23,9 +23,8 @@ impl NodeAtlas {
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
-        let sampler = self.create_texture_sampler(device);
         let bind_group_layout = self.create_bind_group_layout(device);
-        let bind_group = self.create_bind_group(device, &bind_group_layout, &views, &sampler);
+        let bind_group = self.create_bind_group(device, &bind_group_layout, &views);
 
         (textures, bind_group, bind_group_layout)
     }
@@ -40,7 +39,7 @@ impl NodeAtlas {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: wgpu::TextureFormat::R32Uint,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             label: Some("Atlas Texture"),
             view_formats: &[],
@@ -55,7 +54,7 @@ impl NodeAtlas {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: wgpu::TextureFormat::R32Uint,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             label: Some("Atlas Texture"),
             view_formats: &[],
@@ -70,7 +69,7 @@ impl NodeAtlas {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: wgpu::TextureFormat::R32Uint,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             label: Some("Atlas Texture"),
             view_formats: &[],
@@ -82,25 +81,11 @@ impl NodeAtlas {
     fn create_texture_view(&self, texture: &Texture) -> TextureView {
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
             label: Some("Atlas Texture View"),
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            format: Some(wgpu::TextureFormat::R32Uint),
             ..Default::default()
         });
 
         texture_view
-    }
-
-    fn create_texture_sampler(&self, device: &Device) -> Sampler {
-        let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
-        texture_sampler
     }
 
     fn create_bind_group_layout(&self, device: &Device) -> BindGroupLayout {
@@ -111,7 +96,7 @@ impl NodeAtlas {
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        sample_type: wgpu::TextureSampleType::Uint,
                         view_dimension: wgpu::TextureViewDimension::D3,
                         multisampled: false,
                     },
@@ -121,7 +106,7 @@ impl NodeAtlas {
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        sample_type: wgpu::TextureSampleType::Uint,
                         view_dimension: wgpu::TextureViewDimension::D3,
                         multisampled: false,
                     },
@@ -131,16 +116,10 @@ impl NodeAtlas {
                     binding: 2,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        sample_type: wgpu::TextureSampleType::Uint,
                         view_dimension: wgpu::TextureViewDimension::D3,
                         multisampled: false,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
             ],
@@ -154,7 +133,6 @@ impl NodeAtlas {
         device: &Device,
         layout: &BindGroupLayout,
         [view5, view4, view3]: &[TextureView; 3],
-        sampler: &Sampler,
     ) -> BindGroup {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Atlas Texture Bind Group"),
@@ -171,10 +149,6 @@ impl NodeAtlas {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::TextureView(view3),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(sampler),
                 },
             ],
         });

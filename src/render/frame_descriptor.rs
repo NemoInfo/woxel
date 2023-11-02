@@ -3,7 +3,7 @@ use winit::dpi::PhysicalSize;
 
 use crate::{
     render::{
-        gpu_types::{CameraUniform, GpuUniform},
+        gpu_types::{ComputeState, GpuUniform},
         Camera,
     },
     scene::State,
@@ -11,7 +11,7 @@ use crate::{
 
 use super::gpu_types::{
     ComputeOutputTexture, FragmentTexture, GpuPrimitive, GpuQuad, GpuTexture, NodeAtlas,
-    RayUniform, StateUniform, GPU_QUAD,
+    StateUniform, GPU_QUAD,
 };
 
 pub struct FrameDescriptor {
@@ -36,11 +36,12 @@ impl FrameDescriptor {
         StateUniform::from(state).bind(&device)
     }
 
-    pub fn create_camera_binding(
+    pub fn create_compute_state_binding(
         camera: &Camera,
+        size: PhysicalSize<u32>,
         device: &Device,
     ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
-        CameraUniform::from(camera).bind(device)
+        ComputeState::build(camera, size.width as f32).bind(device)
     }
 
     pub fn create_vertex_buffer(&self, device: &Device) -> Buffer {
@@ -61,14 +62,6 @@ impl FrameDescriptor {
             contents: bytemuck::cast_slice(&self.indicies()),
             usage: wgpu::BufferUsages::INDEX,
         })
-    }
-
-    pub fn create_ray_binding(
-        camera: &Camera,
-        size: PhysicalSize<u32>,
-        device: &Device,
-    ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
-        RayUniform::build(&camera, size.width as f32).bind(device)
     }
 
     pub fn create_compute_output_texture_binding(

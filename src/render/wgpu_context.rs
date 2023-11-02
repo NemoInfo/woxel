@@ -207,14 +207,11 @@ impl WgpuContext {
 
         let num_indices = frame_descriptor.indicies().len() as u32;
 
-        let (camera_buffer, camera_buffer_contents, camera_bind_group, camera_bind_group_layout) =
-            FrameDescriptor::create_camera_binding(&scene.camera, &self.device);
+        let (compute_state_buffer, compute_state_buffer_contents, compute_state_bind_group, compute_state_bind_group_layout) =
+            FrameDescriptor::create_compute_state_binding(&scene.camera, self.size, &self.device);
 
         let (state_buffer, state_buffer_contents, state_bind_group, state_bind_group_layout) =
             FrameDescriptor::create_screen_state_binding(&self.device, &scene.state);
-
-        let (ray_buffer, ray_buffer_contents, ray_bind_group, ray_bind_group_layout) =
-            FrameDescriptor::create_ray_binding(&scene.camera, self.size, &self.device);
 
         let (compute_texture, compute_texture_bind_group, compute_texture_bind_group_layout) =
             FrameDescriptor::create_compute_output_texture_binding(&self.device, self.size.into());
@@ -228,8 +225,7 @@ impl WgpuContext {
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Compute Pipline Layout"),
                     bind_group_layouts: &[
-                        &camera_bind_group_layout,
-                        &ray_bind_group_layout,
+                        &compute_state_bind_group_layout,
                         &compute_texture_bind_group_layout,
                         &self.atlas_group.2,
                     ],
@@ -256,10 +252,9 @@ impl WgpuContext {
             });
 
             compute_pass.set_pipeline(&compute_pipeline);
-            compute_pass.set_bind_group(0, &camera_bind_group, &[]);
-            compute_pass.set_bind_group(1, &ray_bind_group, &[]);
-            compute_pass.set_bind_group(2, &compute_texture_bind_group, &[]);
-            compute_pass.set_bind_group(3, &self.atlas_group.1, &[]);
+            compute_pass.set_bind_group(0, &compute_state_bind_group, &[]);
+            compute_pass.set_bind_group(1, &compute_texture_bind_group, &[]);
+            compute_pass.set_bind_group(2, &self.atlas_group.1, &[]);
             // @TODO: CHOOSE WORKGROUPS BASED ON ADAPTOR (32 for NVDIA, 64 for AMD)
             compute_pass.dispatch_workgroups(self.size.width / 8, self.size.height / 4, 1);
         }
@@ -299,10 +294,7 @@ impl WgpuContext {
             .write_buffer(&state_buffer, 0, &state_buffer_contents);
 
         self.queue
-            .write_buffer(&camera_buffer, 0, &camera_buffer_contents);
-
-        self.queue
-            .write_buffer(&ray_buffer, 0, &ray_buffer_contents);
+            .write_buffer(&compute_state_buffer, 0, &compute_state_buffer_contents);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
