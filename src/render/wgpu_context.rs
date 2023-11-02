@@ -1,10 +1,10 @@
 use std::{collections::HashMap, io::BufReader};
 
 use log::warn;
-use wgpu::{BindGroup, BindGroupLayout, ShaderModule, Texture};
+use wgpu::{BindGroup, BindGroupLayout, Buffer, ShaderModule, Texture};
 use winit::window::Window;
 
-use crate::{scene::Scene, vdb::VdbReader};
+use crate::{render::gpu_types::MaskUniform, scene::Scene, vdb::VdbReader};
 
 use super::{
     frame_descriptor::FrameDescriptor,
@@ -18,6 +18,7 @@ pub struct WgpuContext {
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
     atlas_group: ([Texture; 3], BindGroup, BindGroupLayout),
+    masks_group: ([Buffer; 5], [Vec<u8>; 5], BindGroup, BindGroupLayout),
     shaders: HashMap<&'static str, ShaderModule>,
     _textures: HashMap<&'static str, (Texture, BindGroup, BindGroupLayout)>,
 }
@@ -67,9 +68,6 @@ impl WgpuContext {
 
         warn!("Device: {:?}", &device);
 
-        let limits = device.limits();
-        println!("Maximum bind groups supported: {}", limits.max_bind_groups);
-
         let surface_caps = surface.get_capabilities(&adapter);
         // we want to work with srgb format
         let surface_format = surface_caps
@@ -97,74 +95,56 @@ impl WgpuContext {
         println!("Loaded vdb");
         let atlas = vdb.atlas();
 
-        let atlas_size @ [size5, size4, size3] =
-            atlas.iter().map(|n| [n.len() as u32, n[0].len() as u32, n[0][0].len() as u32]).collect::<Vec<_>>().try_into().unwrap();
+        let atlas_size = atlas
+            .iter()
+            .map(|n| [n.len() as u32, n[0].len() as u32, n[0][0].len() as u32])
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         dbg!(atlas_size);
 
-        let ([texture5, texture4, texture3], bind_group, bind_group_layout) =
+        let (atlas_textures, bind_group, bind_group_layout) =
             FrameDescriptor::create_compute_vdb_atlas_texture_binding(&device, atlas_size);
 
-        let flat_atlas: [Vec<u8>; 3] = atlas.iter().map(|n| {
-            n.iter()
-                .flat_map(|plane| {
-                    plane
-                        .iter()
-                        .flat_map(|row| row.iter().flat_map(|val| val.to_ne_bytes()))
-                })
-                .collect()
-        }).collect::<Vec<_>>().try_into().unwrap();
+        let flat_atlas: [Vec<u8>; 3] = atlas
+            .iter()
+            .map(|n| {
+                n.iter()
+                    .flat_map(|plane| {
+                        plane
+                            .iter()
+                            .flat_map(|row| row.iter().flat_map(|val| val.to_ne_bytes()))
+                    })
+                    .collect()
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
-        queue.write_texture(
-            texture5.as_image_copy(),
-            &flat_atlas[0],
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(size5[0] * 4), // 4 bytes per u32
-                rows_per_image: Some(size5[1]),
-            },
-            wgpu::Extent3d {
-                width: size5[0],
-                height: size5[1],
-                depth_or_array_layers: size5[2],
-            },
-        );
+        for i in 0..3 {
+            queue.write_texture(
+                atlas_textures[i].as_image_copy(),
+                &flat_atlas[i],
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(atlas_size[i][0] * 4), // 4 bytes per u32
+                    rows_per_image: Some(atlas_size[i][1]),
+                },
+                wgpu::Extent3d {
+                    width: atlas_size[i][0],
+                    height: atlas_size[i][1],
+                    depth_or_array_layers: atlas_size[i][2],
+                },
+            );
+        }
 
-        println!("Wrote texture5");
+        let (mask_buffers, mask_buffers_contents, mask_bind_group, mask_bind_group_layout) =
+            MaskUniform::from(&vdb).bind(&device);
 
-        queue.write_texture(
-            texture4.as_image_copy(),
-            &flat_atlas[1],
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(size4[0] * 4), // 4 bytes per u32
-                rows_per_image: Some(size4[1]),
-            },
-            wgpu::Extent3d {
-                width: size4[0],
-                height: size4[1],
-                depth_or_array_layers: size4[2],
-            },
-        );
-
-        println!("Wrote texture4");
-
-        queue.write_texture(
-            texture3.as_image_copy(),
-            &flat_atlas[2],
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(size3[0] * 4), // 4 bytes per u32
-                rows_per_image: Some(size3[1]),
-            },
-            wgpu::Extent3d {
-                width: size3[0],
-                height: size3[1],
-                depth_or_array_layers: size3[2],
-            },
-        );
-
-        println!("Wrote texture3");
+        for i in 0..mask_buffers.len() {
+            queue.write_buffer(&mask_buffers[i], 0, &mask_buffers_contents[i]);
+        }
 
         Self {
             surface,
@@ -172,7 +152,13 @@ impl WgpuContext {
             queue,
             config,
             size,
-            atlas_group: ([texture5, texture4, texture3], bind_group, bind_group_layout),
+            masks_group: (
+                mask_buffers,
+                mask_buffers_contents,
+                mask_bind_group,
+                mask_bind_group_layout,
+            ),
+            atlas_group: (atlas_textures, bind_group, bind_group_layout),
             shaders: HashMap::new(),
             _textures: HashMap::new(),
         }
@@ -207,8 +193,12 @@ impl WgpuContext {
 
         let num_indices = frame_descriptor.indicies().len() as u32;
 
-        let (compute_state_buffer, compute_state_buffer_contents, compute_state_bind_group, compute_state_bind_group_layout) =
-            FrameDescriptor::create_compute_state_binding(&scene.camera, self.size, &self.device);
+        let (
+            compute_state_buffer,
+            compute_state_buffer_contents,
+            compute_state_bind_group,
+            compute_state_bind_group_layout,
+        ) = FrameDescriptor::create_compute_state_binding(&scene.camera, self.size, &self.device);
 
         let (state_buffer, state_buffer_contents, state_bind_group, state_bind_group_layout) =
             FrameDescriptor::create_screen_state_binding(&self.device, &scene.state);
@@ -219,7 +209,6 @@ impl WgpuContext {
         let (fragment_texture, fragment_texture_bind_group, fragment_texture_bind_group_layout) =
             FrameDescriptor::create_fragment_texture_binding(&self.device, self.size.into());
 
-
         let compute_pipline_layout =
             self.device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -228,6 +217,7 @@ impl WgpuContext {
                         &compute_state_bind_group_layout,
                         &compute_texture_bind_group_layout,
                         &self.atlas_group.2,
+                        &self.masks_group.3,
                     ],
                     push_constant_ranges: &[],
                 });
@@ -255,6 +245,7 @@ impl WgpuContext {
             compute_pass.set_bind_group(0, &compute_state_bind_group, &[]);
             compute_pass.set_bind_group(1, &compute_texture_bind_group, &[]);
             compute_pass.set_bind_group(2, &self.atlas_group.1, &[]);
+            compute_pass.set_bind_group(3, &self.masks_group.2, &[]);
             // @TODO: CHOOSE WORKGROUPS BASED ON ADAPTOR (32 for NVDIA, 64 for AMD)
             compute_pass.dispatch_workgroups(self.size.width / 8, self.size.height / 4, 1);
         }

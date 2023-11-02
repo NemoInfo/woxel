@@ -27,6 +27,29 @@ var node4s: texture_3d<u32>;
 @group(2) @binding(2)
 var node3s: texture_3d<u32>;
 
+struct Node5Mask {
+    m: array<u32, 1024>, // 32^3/32
+};
+
+struct Node4Mask {
+    m: array<u32, 128>, // 16^3/32
+};
+
+struct Node3Mask {
+    m: array<u32, 16>, // 8^3/32
+};
+
+@group(3) @binding(0)
+var<storage, read> kids5: array<Node5Mask>;
+@group(3) @binding(1)
+var<storage, read> vals5: array<Node5Mask>;
+@group(3) @binding(2)
+var<storage, read> kids4: array<Node4Mask>;
+@group(3) @binding(3)
+var<storage, read> vals4: array<Node4Mask>;
+@group(3) @binding(4)
+var<storage, read> vals3: array<Node3Mask>;
+
 @compute @workgroup_size(8,4)
 fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var p = vec2<f32>(global_id.xy) + vec2(0.001);

@@ -105,13 +105,20 @@ where
         }
     }
 
-    pub fn masks(&self) -> [Vec<u32>; 5] {
-        let [count_n5, count_n4, count_n3] = self.count_nodes();
-        let mut n5_kids = vec![0; count_n5 * (N5DIM * N5DIM * N5DIM) / 32];
-        let mut n5_vals = vec![0; count_n5 * (N5DIM * N5DIM * N5DIM) / 32];
-        let mut n4_kids = vec![0; count_n4 * (N4DIM * N4DIM * N4DIM) / 32];
-        let mut n4_vals = vec![0; count_n4 * (N4DIM * N4DIM * N4DIM) / 32];
-        let mut n3_vals = vec![0; count_n3 * (N3DIM * N3DIM * N3DIM) / 32];
+    pub fn masks(
+        &self,
+    ) -> (
+        Vec<[u32; 32 * 32 * 32 / 32]>,
+        Vec<[u32; 32 * 32 * 32 / 32]>,
+        Vec<[u32; 16 * 16 * 16 / 32]>,
+        Vec<[u32; 16 * 16 * 16 / 32]>,
+        Vec<[u32; 8 * 8 * 8 / 32]>,
+    ) {
+        let mut n5_kids = vec![];
+        let mut n5_vals = vec![];
+        let mut n4_kids = vec![];
+        let mut n4_vals = vec![];
+        let mut n3_vals = vec![];
 
         for (_origin, root_data) in self.root.map.iter() {
             let RootData::Node(node5) = root_data else {
@@ -128,18 +135,18 @@ where
                         continue;
                     };
 
-                    n3_vals.append(&mut vec32_from_vec64(node3.value_mask.to_vec()));
+                    n3_vals.push(arr32_from_arr64(&node3.value_mask));
                 }
 
-                n4_vals.append(&mut vec32_from_vec64(node4.value_mask.to_vec()));
-                n4_kids.append(&mut vec32_from_vec64(node4.child_mask.to_vec()));
+                n4_vals.push(arr32_from_arr64(&node4.value_mask));
+                n4_kids.push(arr32_from_arr64(&node4.child_mask));
             }
 
-            n5_vals.append(&mut vec32_from_vec64(node5.value_mask.to_vec()));
-            n5_kids.append(&mut vec32_from_vec64(node5.child_mask.to_vec()));
+            n5_vals.push(arr32_from_arr64(&node5.value_mask));
+            n5_kids.push(arr32_from_arr64(&node5.child_mask));
         }
 
-        [n5_kids, n5_vals, n4_kids, n4_vals, n3_vals]
+        (n5_kids, n5_vals, n4_kids, n4_vals, n3_vals)
     }
 
     pub fn atlas(&self) -> [Vec<Vec<Vec<ValueType>>>; 3] {
@@ -270,12 +277,12 @@ where
     }
 }
 
-fn vec32_from_vec64(vec: Vec<u64>) -> Vec<u32> {
-    let mut result = vec![];
+fn arr32_from_arr64<const SIZE: usize>(arr: &[u64; SIZE]) -> [u32; SIZE * 2] {
+    let mut result = [0u32; SIZE * 2];
 
-    for num in vec {
-        result.push((num >> 32) as u32); // Extract the first byte
-        result.push(num as u32); // Extract the second byte
+    for (i, num) in arr.iter().enumerate() {
+        result[i * 2] = (num >> 32) as u32; // Extract the first byte
+        result[i * 2 + 1] = *num as u32; // Extract the second byte
     }
 
     result
