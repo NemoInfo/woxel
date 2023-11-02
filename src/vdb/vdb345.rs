@@ -144,9 +144,29 @@ where
 
     pub fn atlas(&self) -> [Vec<Vec<Vec<ValueType>>>; 3] {
         let [count_n5, count_n4, count_n3] = self.count_nodes();
-        let mut n5_atlas = vec![vec![vec![ValueType::zeroed(); N5DIM]; N5DIM]; N5DIM * count_n5];
-        let mut n4_atlas = vec![vec![vec![ValueType::zeroed(); N4DIM]; N4DIM]; N4DIM * count_n4];
-        let mut n3_atlas = vec![vec![vec![ValueType::zeroed(); N3DIM]; N3DIM]; N3DIM * count_n3];
+
+        let n5_atlas_dim = closest_power_of_3(count_n5);
+        dbg!(n5_atlas_dim);
+        let n4_atlas_dim = closest_power_of_3(count_n4);
+        dbg!(n4_atlas_dim);
+        let n3_atlas_dim = closest_power_of_3(count_n3);
+        dbg!(n3_atlas_dim);
+
+        let mut n5_atlas =
+            vec![
+                vec![vec![ValueType::zeroed(); N5DIM * n5_atlas_dim]; N5DIM * n5_atlas_dim];
+                N5DIM * n5_atlas_dim
+            ];
+        let mut n4_atlas =
+            vec![
+                vec![vec![ValueType::zeroed(); N4DIM * n4_atlas_dim]; N4DIM * n4_atlas_dim];
+                N4DIM * n4_atlas_dim
+            ];
+        let mut n3_atlas =
+            vec![
+                vec![vec![ValueType::zeroed(); N3DIM * n3_atlas_dim]; N3DIM * n3_atlas_dim];
+                N3DIM * n3_atlas_dim
+            ];
 
         let mut n5_idx: usize = 0;
         let mut n4_idx: usize = 0;
@@ -157,7 +177,7 @@ where
                 // TODO: handle node5 tiles
                 continue;
             };
-            let n5_atlas_origin: Vector3<usize> = [n5_idx * N5DIM, 0, 0].into();
+            let n5_atlas_origin: Vector3<usize> = origin_from_idx(n5_idx, n5_atlas_dim);
 
             for (offset, node5_data) in node5.data.iter().enumerate() {
                 let n5_data_rel: Vector3<usize> = <N5<ValueType>>::offset_to_relative(offset)
@@ -174,7 +194,7 @@ where
                         node4_tile;
                     continue;
                 };
-                let n4_atlas_origin: Vector3<usize> = [n4_idx * N4DIM, 0, 0].into();
+                let n4_atlas_origin: Vector3<usize> = origin_from_idx(n4_idx, n4_atlas_dim);
 
                 for (offset, node4_data) in node4.data.iter().enumerate() {
                     let n4_data_rel: Vector3<usize> = <N4<ValueType>>::offset_to_relative(offset)
@@ -191,7 +211,7 @@ where
                             node3_tile;
                         continue;
                     };
-                    let n3_atlas_origin: Vector3<usize> = [n3_idx * N3DIM, 0, 0].into();
+                    let n3_atlas_origin: Vector3<usize> = origin_from_idx(n3_idx, n3_atlas_dim);
 
                     for (offset, node3_data) in node3.data.iter().enumerate() {
                         let n3_data_rel: Vector3<usize> =
@@ -259,6 +279,18 @@ fn vec32_from_vec64(vec: Vec<u64>) -> Vec<u32> {
     }
 
     result
+}
+
+fn closest_power_of_3(n: usize) -> usize {
+    let mut i = 0;
+    while i * i * i < n {
+        i += 1;
+    }
+    i
+}
+
+fn origin_from_idx(idx: usize, dim: usize) -> Vector3<usize> {
+    (idx % dim, (idx / dim) % dim, idx / (dim * dim)).into()
 }
 
 #[cfg(test)]

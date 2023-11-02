@@ -17,11 +17,22 @@ var<uniform> r: RayUniform;
 @group(2) @binding(0)
 var texture: texture_storage_2d<rgba8unorm, write>;
 
+@group(3) @binding(0)
+var node5s: texture_3d<f32>;
+@group(3) @binding(1)
+var node4s: texture_3d<f32>;
+@group(3) @binding(2)
+var node3s: texture_3d<f32>;
+
 @compute @workgroup_size(8,4)
 fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var p = vec2<f32>(global_id.xy) + vec2(0.001);
     var ray_dir = normalize((p.x * r.u + p.y * r.mv + r.wp).xyz);
     var color = vec4(cast_ray(camera.eye, ray_dir),1.0);
+    var val = textureLoad(node5s, vec3<i32>(0, 0, 0), 0);
+    // We got this from the VDB!!
+    //  Shader madness incoming
+
     textureStore(texture, global_id.xy, color);
 }
 const MAX_RAY_STEPS: i32 = 128;

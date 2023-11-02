@@ -80,9 +80,9 @@ impl FrameDescriptor {
 
     pub fn create_compute_vdb_atlas_texture_binding(
         device: &Device,
-        size: [u32; 3],
-    ) -> (Texture, BindGroup, BindGroupLayout) {
-        NodeAtlas::new(size).bind(device)
+        [size5, size4, size3]: [[u32; 3]; 3],
+    ) -> ([Texture; 3], BindGroup, BindGroupLayout) {
+        NodeAtlas::new(size5, size4, size3).bind(device)
     }
 
     pub fn create_fragment_texture_binding(
