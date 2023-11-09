@@ -81,6 +81,12 @@ where
     ValueType: VdbValueType,
 {
     pub data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize],
+    // IMPORTANT: the mask is encoded inside u64 in the following way
+    // [ 63..0, 127..64, .... ]
+    // this means it is indexed like
+    //  mask[offset / 64] & ( 1 << ( offset % 64 ) )
+    //                    OR
+    //  mask[offset >> 6] & ( 1 << ( offset & 63 ) )
     pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
     pub flags: u64,
 }

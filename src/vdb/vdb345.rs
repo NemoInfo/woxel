@@ -1,4 +1,5 @@
 use cgmath::Vector3;
+use itertools::Itertools;
 
 use crate::vdb::data_structure::*;
 
@@ -105,6 +106,17 @@ where
         }
     }
 
+    pub fn origins(&self) -> Vec<[i32; 3]> {
+        let mut origins = vec![];
+        for (origin, root_data) in self.root.map.iter().sorted_by_key(|(key, _)| *key) {
+            if let RootData::Node(_) = root_data {
+                origins.push(*origin);
+            }
+        }
+
+        origins
+    }
+
     pub fn masks(
         &self,
     ) -> (
@@ -120,7 +132,7 @@ where
         let mut n4_vals = vec![];
         let mut n3_vals = vec![];
 
-        for (_origin, root_data) in self.root.map.iter() {
+        for (_origin, root_data) in self.root.map.iter().sorted_by_key(|(key, _)| *key) {
             let RootData::Node(node5) = root_data else {
                 continue;
             };
@@ -153,11 +165,8 @@ where
         let [count_n5, count_n4, count_n3] = self.count_nodes();
 
         let n5_atlas_dim = closest_power_of_3(count_n5);
-        dbg!(n5_atlas_dim);
         let n4_atlas_dim = closest_power_of_3(count_n4);
-        dbg!(n4_atlas_dim);
         let n3_atlas_dim = closest_power_of_3(count_n3);
-        dbg!(n3_atlas_dim);
 
         let mut n5_atlas =
             vec![
@@ -179,12 +188,13 @@ where
         let mut n4_idx: usize = 0;
         let mut n3_idx: usize = 0;
 
-        for (_origin, root_data) in self.root.map.iter() {
+        for (_origin, root_data) in self.root.map.iter().sorted_by_key(|(key, _)| *key) {
             let RootData::Node(node5) = root_data else {
                 // TODO: handle node5 tiles
                 continue;
             };
-            let n5_atlas_origin: Vector3<usize> = origin_from_idx(n5_idx, n5_atlas_dim);
+            let n5_atlas_origin: Vector3<usize> =
+                origin_from_idx(n5_idx, n5_atlas_dim) * <N5<ValueType>>::DIM as usize;
 
             for (offset, node5_data) in node5.data.iter().enumerate() {
                 let n5_data_rel: Vector3<usize> = <N5<ValueType>>::offset_to_relative(offset)
@@ -201,7 +211,8 @@ where
                         node4_tile;
                     continue;
                 };
-                let n4_atlas_origin: Vector3<usize> = origin_from_idx(n4_idx, n4_atlas_dim);
+                let n4_atlas_origin: Vector3<usize> =
+                    origin_from_idx(n4_idx, n4_atlas_dim) * <N4<ValueType>>::DIM as usize;
 
                 for (offset, node4_data) in node4.data.iter().enumerate() {
                     let n4_data_rel: Vector3<usize> = <N4<ValueType>>::offset_to_relative(offset)
@@ -218,7 +229,8 @@ where
                             node3_tile;
                         continue;
                     };
-                    let n3_atlas_origin: Vector3<usize> = origin_from_idx(n3_idx, n3_atlas_dim);
+                    let n3_atlas_origin: Vector3<usize> =
+                        origin_from_idx(n3_idx, n3_atlas_dim) * <N3<ValueType>>::DIM as usize;
 
                     for (offset, node3_data) in node3.data.iter().enumerate() {
                         let n3_data_rel: Vector3<usize> =
@@ -281,8 +293,8 @@ fn arr32_from_arr64<const SIZE: usize>(arr: &[u64; SIZE]) -> [u32; SIZE * 2] {
     let mut result = [0u32; SIZE * 2];
 
     for (i, num) in arr.iter().enumerate() {
-        result[i * 2] = (num >> 32) as u32; // Extract the first byte
-        result[i * 2 + 1] = *num as u32; // Extract the second byte
+        result[i * 2] = *num as u32; // Extract the first byte
+        result[i * 2 + 1] = (num >> 32) as u32; // Extract the second byte
     }
 
     result

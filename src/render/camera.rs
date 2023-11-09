@@ -17,9 +17,9 @@ impl Camera {
         Camera {
             // position the camera one unit up and 2 units back
             // +z is out of the screen
-            eye: (0.5, 0.5, -2.5).into(),
+            eye: (0.5, 0.5, -500.5).into(),
             // have it look at the origin
-            target: (0.5, 0.5, 0.5).into(),
+            target: (0.5, 0.5, -498.5).into(),
             // which way is "up"
             up: cgmath::Vector3::unit_y(),
             aspect,
@@ -69,7 +69,7 @@ pub struct CameraController {
 
 const CAMERA_MIN_Y_ANGLE: f32 = 20.0;
 const CAMERA_MOUSE_SENSITIVITY: f32 = 2.3 * 60.;
-const CAMERA_SPEED: f32 = 0.1 * 60.;
+const CAMERA_SPEED: f32 = 0.1 * 60. * 20.;
 
 impl CameraController {
     pub fn new() -> Self {
@@ -129,6 +129,7 @@ impl CameraController {
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, state: &State) {
+        //        dbg!(camera.target);
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
 

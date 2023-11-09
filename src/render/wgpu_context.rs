@@ -18,7 +18,7 @@ pub struct WgpuContext {
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
     atlas_group: ([Texture; 3], BindGroup, BindGroupLayout),
-    masks_group: ([Buffer; 5], [Vec<u8>; 5], BindGroup, BindGroupLayout),
+    masks_group: ([Buffer; 6], [Vec<u8>; 6], BindGroup, BindGroupLayout),
     shaders: HashMap<&'static str, ShaderModule>,
     _textures: HashMap<&'static str, (Texture, BindGroup, BindGroupLayout)>,
 }
@@ -91,9 +91,11 @@ impl WgpuContext {
 
         let f = std::fs::File::open("assets/utahteapot.vdb").unwrap();
         let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
-        let vdb = vdb_reader.read_vdb345_grid::<f32>("ls_utahteapot").unwrap();
+        let vdb = vdb_reader.read_vdb345_grid::<u32>("ls_utahteapot").unwrap();
+
         println!("Loaded vdb");
         let atlas = vdb.atlas();
+
 
         let atlas_size = atlas
             .iter()
@@ -102,21 +104,21 @@ impl WgpuContext {
             .try_into()
             .unwrap();
 
-        dbg!(atlas_size);
-
         let (atlas_textures, bind_group, bind_group_layout) =
             FrameDescriptor::create_compute_vdb_atlas_texture_binding(&device, atlas_size);
 
         let flat_atlas: [Vec<u8>; 3] = atlas
             .iter()
-            .map(|n| {
-                n.iter()
-                    .flat_map(|plane| {
-                        plane
-                            .iter()
-                            .flat_map(|row| row.iter().flat_map(|val| val.to_ne_bytes()))
-                    })
-                    .collect()
+            .map(|cube| {
+                let mut flat = vec![];
+                for x in 0..cube.len() {
+                    for y in 0..cube[0].len() {
+                        for z in 0..cube[0][0].len() {
+                            flat.append(&mut cube[z][y][x].to_ne_bytes().to_vec());
+                        }
+                    }
+                }
+                flat
             })
             .collect::<Vec<_>>()
             .try_into()
