@@ -90,7 +90,7 @@ impl EguiDev {
                     model_changed |= ui
                         .selectable_value(&mut self.model, Model::Cube, Model::Cube.rich_text())
                         .clicked();
-                })
+                });
             });
 
         let full_output = self.platform.end_frame(Some(&window));

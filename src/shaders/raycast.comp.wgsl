@@ -74,6 +74,7 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     var c = dir;
 
     var leaf: VdbLeaf;
+    leaf.empty = true;
 
     for(i = 0; i < HDDA_MAX_RAY_STEPS; i++) {
         // FIND VBD LEAF
@@ -128,14 +129,26 @@ fn get_vdb_leaf_from_leaf(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
         if all(leaf.parents[2].origin == node3_global) {
             return get_vdb_leaf_from_node3(pos, leaf);
         }
-        return get_vdb_leaf_from_node4(pos, leaf);
+        let node4_global = global_to_node(pos, NODE4_TOTAL_LOG_D);
+        if all(leaf.parents[1].origin == node4_global) {
+            return get_vdb_leaf_from_node4(pos, leaf);
+        }
+        let node5_global = global_to_node(pos, NODE5_TOTAL_LOG_D);
+        if all(leaf.parents[0].origin == node4_global) {
+            return get_vdb_leaf_from_node5(pos, leaf);
+        }
+        return get_vdb_leaf_from_nothing(pos, leaf);
     }
     if leaf.num_parents == 2u {
         let node4_global = global_to_node(pos, NODE4_TOTAL_LOG_D);
         if all(leaf.parents[1].origin == node4_global) {
             return get_vdb_leaf_from_node4(pos, leaf);
         }
-        return get_vdb_leaf_from_node5(pos, leaf);
+        let node5_global = global_to_node(pos, NODE5_TOTAL_LOG_D);
+        if all(leaf.parents[0].origin == node4_global) {
+            return get_vdb_leaf_from_node5(pos, leaf);
+        }
+        return get_vdb_leaf_from_nothing(pos, leaf);
     }
     if leaf.num_parents == 1u {
         let node5_global = global_to_node(pos, NODE5_TOTAL_LOG_D);
@@ -144,11 +157,7 @@ fn get_vdb_leaf_from_leaf(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
         }
         return get_vdb_leaf_from_nothing(pos, leaf);
     }
-    if leaf.num_parents == 0u {
-        return get_vdb_leaf_from_nothing(pos, leaf);
-    }
-
-    return leaff;
+    return get_vdb_leaf_from_nothing(pos, leaf);
 }
 
 fn get_vdb_leaf_from_nothing(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
@@ -245,7 +254,7 @@ fn get_vdb_leaf_from_node3(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
     if (in_val3) {
         return VdbLeaf(vec3<f32>(0.1), false, 3u, leaf.parents);
     }
-    return VdbLeaf(vec3<f32>(0.0), true ,3u, leaf.parents);
+    return VdbLeaf(vec3<f32>(0.0), true, 3u, leaf.parents);
 }
 
 const MAX_RAY_STEPS: i32 = 1500;
