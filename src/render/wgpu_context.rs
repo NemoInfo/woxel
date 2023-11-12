@@ -306,7 +306,7 @@ impl WgpuContext {
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
 
-        let (tdelta, paint_jobs, screen_descriptor) = self.egui_dev.get_frame(scene, window);
+        let (tdelta, paint_jobs, screen_descriptor, model_changed) = self.egui_dev.get_frame(scene, window);
 
         self.egui_rpass
             .add_textures(&self.device, &self.queue, &tdelta)
@@ -333,6 +333,10 @@ impl WgpuContext {
         self.egui_rpass
             .remove_textures(tdelta)
             .expect("remove textures ok");
+
+        if model_changed {
+            self.change_vdb_model(self.egui_dev.model.file());
+        }
 
         Ok(())
     }

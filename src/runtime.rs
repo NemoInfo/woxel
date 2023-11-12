@@ -29,10 +29,13 @@ impl Runtime {
         _target: &EventLoopWindowTarget<T>,
         control_flow: &mut ControlFlow,
     ) {
-        self.context.egui_dev.platform.handle_event(&event);
-        if self.context.egui_dev.platform.captures_event(&event) {
-            // This check if the event shouldn't be propagated onto the window
-            return;
+        if !self.scene.state.cursor_grabbed {
+            // The ui should only capture events if we haven't grabbed the cursor, i.e. we are notin FPS mode.
+            self.context.egui_dev.platform.handle_event(&event);
+            if self.context.egui_dev.platform.captures_event(&event) {
+                // This check if the event shouldn't be propagated onto the window
+                return;
+            }
         }
 
         match event {
