@@ -7,6 +7,7 @@ use winit::window::Window;
 use crate::{render::gpu_types::MaskUniform, scene::Scene, vdb::VdbReader};
 
 use super::{
+    egui_dev::EguiDev,
     frame_descriptor::FrameDescriptor,
     pipelines::{CPipeline, ComputePipeline, Pipeline, VoxelPipeline},
 };
@@ -17,6 +18,8 @@ pub struct WgpuContext {
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
+    pub egui_dev: EguiDev,
+    pub egui_rpass: egui_wgpu_backend::RenderPass,
     atlas_group: ([Texture; 3], BindGroup, BindGroupLayout),
     masks_group: ([Buffer; 6], [Vec<u8>; 6], BindGroup, BindGroupLayout),
     shaders: HashMap<&'static str, ShaderModule>,
@@ -30,6 +33,7 @@ impl WgpuContext {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             dx12_shader_compiler: Default::default(),
+            ..Default::default()
         });
 
         let surface = unsafe { instance.create_surface(&window) }.unwrap();
@@ -96,7 +100,6 @@ impl WgpuContext {
         println!("Loaded vdb");
         let atlas = vdb.atlas();
 
-
         let atlas_size = atlas
             .iter()
             .map(|n| [n.len() as u32, n[0].len() as u32, n[0][0].len() as u32])
@@ -148,12 +151,27 @@ impl WgpuContext {
             queue.write_buffer(&mask_buffers[i], 0, &mask_buffers_contents[i]);
         }
 
+        let egui_platform =
+            egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor {
+                physical_width: size.width,
+                physical_height: size.height,
+                scale_factor: window.scale_factor(),
+                font_definitions: egui::FontDefinitions::default(),
+                style: Default::default(),
+            });
+
+        let egui_dev = EguiDev::new(egui_platform);
+
+        let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
+
         Self {
             surface,
             device,
             queue,
             config,
             size,
+            egui_dev,
+            egui_rpass,
             masks_group: (
                 mask_buffers,
                 mask_buffers_contents,
@@ -175,7 +193,7 @@ impl WgpuContext {
         }
     }
 
-    pub fn render(&mut self, scene: &Scene) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, scene: &Scene, window: &Window) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -262,6 +280,10 @@ impl WgpuContext {
             },
         );
 
+        let output_view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -274,6 +296,7 @@ impl WgpuContext {
                     },
                 })],
                 depth_stencil_attachment: None,
+                ..Default::default()
             });
             render_pass.set_pipeline(&render_pipeline);
             render_pass.set_bind_group(0, &fragment_texture_bind_group, &[]);
@@ -283,14 +306,33 @@ impl WgpuContext {
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
 
+        let (tdelta, paint_jobs, screen_descriptor) = self.egui_dev.get_frame(scene, window);
+
+        self.egui_rpass
+            .add_textures(&self.device, &self.queue, &tdelta)
+            .expect("add textures ok");
+        self.egui_rpass
+            .update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
+        self.egui_rpass
+            .execute(
+                &mut encoder,
+                &output_view,
+                &paint_jobs,
+                &screen_descriptor,
+                None,
+            )
+            .unwrap();
+
         self.queue
             .write_buffer(&state_buffer, 0, &state_buffer_contents);
-
         self.queue
             .write_buffer(&compute_state_buffer, 0, &compute_state_buffer_contents);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+        self.egui_rpass
+            .remove_textures(tdelta)
+            .expect("remove textures ok");
 
         Ok(())
     }
@@ -307,5 +349,72 @@ impl WgpuContext {
         self.shaders
             .get(name)
             .unwrap_or_else(|| panic!("No shader with name '{name}'"))
+    }
+
+    pub fn change_vdb_model(&mut self, name: &'static str) {
+        let f = std::fs::File::open(format!("assets/{name}.vdb")).unwrap();
+        let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
+        // TODO: Display vdb options and read accordingly
+        let vdb = vdb_reader
+            .read_vdb345_grid::<u32>(&format!("ls_{name}"))
+            .unwrap();
+
+        let atlas = vdb.atlas();
+
+        let atlas_size = atlas
+            .iter()
+            .map(|n| [n.len() as u32, n[0].len() as u32, n[0][0].len() as u32])
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        self.atlas_group =
+            FrameDescriptor::create_compute_vdb_atlas_texture_binding(&self.device, atlas_size);
+
+        let flat_atlas: [Vec<u8>; 3] = atlas
+            .iter()
+            .map(|cube| {
+                let mut flat = vec![];
+                for x in 0..cube.len() {
+                    for y in 0..cube[0].len() {
+                        for z in 0..cube[0][0].len() {
+                            flat.append(&mut cube[z][y][x].to_ne_bytes().to_vec());
+                        }
+                    }
+                }
+                flat
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        for i in 0..3 {
+            self.queue.write_texture(
+                self.atlas_group.0[i].as_image_copy(),
+                &flat_atlas[i],
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(atlas_size[i][0] * 4), // 4 bytes per u32
+                    rows_per_image: Some(atlas_size[i][1]),
+                },
+                wgpu::Extent3d {
+                    width: atlas_size[i][0],
+                    height: atlas_size[i][1],
+                    depth_or_array_layers: atlas_size[i][2],
+                },
+            );
+        }
+
+        self.masks_group = MaskUniform::from(&vdb).bind(&self.device);
+
+        for i in 0..self.masks_group.0.len() {
+            self.queue
+                .write_buffer(&self.masks_group.0[i], 0, &self.masks_group.1[i]);
+        }
+
+        for i in 0..self.masks_group.0.len() {
+            self.queue
+                .write_buffer(&self.masks_group.0[i], 0, &self.masks_group.1[i]);
+        }
     }
 }

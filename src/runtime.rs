@@ -29,6 +29,12 @@ impl Runtime {
         _target: &EventLoopWindowTarget<T>,
         control_flow: &mut ControlFlow,
     ) {
+        self.context.egui_dev.platform.handle_event(&event);
+        if self.context.egui_dev.platform.captures_event(&event) {
+            // This check if the event shouldn't be propagated onto the window
+            return;
+        }
+
         match event {
             Event::WindowEvent {
                 ref event,
@@ -67,7 +73,8 @@ impl Runtime {
             }
             Event::RedrawRequested(window_id) if window_id == self.window.id() => {
                 self.scene.update();
-                match self.context.render(&self.scene) {
+
+                match self.context.render(&self.scene, &self.window) {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
                     Err(wgpu::SurfaceError::Lost) => self.context.resize(self.context.size),
@@ -106,6 +113,17 @@ impl Runtime {
     }
 
     fn handle_cursor_pressed(&mut self) {
+        if self.scene.state.cursor_grabbed {
+            if let Ok(_) = self
+                .window
+                .set_cursor_grab(winit::window::CursorGrabMode::None)
+            {
+                self.scene.state.cursor_grabbed = false;
+                self.window.set_cursor_visible(true);
+            }
+
+            return;
+        }
         match self
             .window
             .set_cursor_grab(winit::window::CursorGrabMode::Confined)

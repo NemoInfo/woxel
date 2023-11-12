@@ -10,3 +10,5 @@ pub use camera::{Camera, CameraController};
 mod frame_descriptor;
 mod gpu_types;
 mod pipelines;
+
+mod egui_dev;

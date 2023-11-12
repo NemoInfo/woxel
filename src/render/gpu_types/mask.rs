@@ -106,7 +106,6 @@ impl<'a, ValueType: VdbValueType> From<&'a VDB345<ValueType>> for MaskUniform {
             .iter()
             .map(|&[x, y, z]| [x, y, z, 0])
             .collect::<Vec<_>>();
-        dbg!(&origins);
 
         Self {
             kids5,
