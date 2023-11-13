@@ -62,39 +62,48 @@ fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     textureStore(texture, global_id.xy, color);
 }
 
-const HDDA_MAX_RAY_STEPS: i32 = 1500;
+const HDDA_MAX_RAY_STEPS: u32 = 1000u;
+const scale = array<i32, 4>(1, 8, 128, 4096);
 fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     var ipos = vec3<i32>(floor(src));
     var deltaDist = abs(vec3<f32>(length(dir)) / dir);
     var step = vec3<i32>(sign(dir));
-    var sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5) + 0.5) * deltaDist;
     var mask = vec3<bool>(false);
 
-    var i: i32 = 0;
     var c = dir;
 
     var leaf: VdbLeaf;
-    leaf.empty = true;
+    leaf = get_vdb_leaf_from_nothing(ipos, leaf);
 
-    for(i = 0; i < HDDA_MAX_RAY_STEPS; i++) {
-        // FIND VBD LEAF
-        // RECORD LEVEL
-        // IF VALUE RETURN
-        // IF EMPTY STEP * LEVEL
-        //
+    var sideDist: vec3<f32>;
+    switch leaf.num_parents {
+        case 3u: {
+            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 ) + 0.5 ) * deltaDist;
+        }
+        case 2u: {
+            ipos = global_to_node(ipos, NODE3_TOTAL_LOG_D);
+            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 * 8.0) + 0.5 * 8.0) * deltaDist;
+        }
+        case 1u: {
+            ipos = global_to_node(ipos, NODE4_TOTAL_LOG_D);
+            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 * 8.0 * 16.0) + 0.5 * 8.0 * 16.0) * deltaDist;
+        }
+        case 0u: {
+            ipos = global_to_node(ipos, NODE5_TOTAL_LOG_D);
+            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 * 8.0 * 16.0 * 32.0) + 0.5 * 8.0 * 16.0 * 32.0) * deltaDist;
+        }
+        default: {
+            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 ) + 0.5 ) * deltaDist;
+        }
+    }
+
+
+    var s: i32;
+    for(var i: u32 = 0u; i < HDDA_MAX_RAY_STEPS; i++) {
         leaf = get_vdb_leaf_from_leaf(ipos, leaf);
+
         if !leaf.empty {
-            return leaf.color + vec3<f32>(0.25, 0.5, 0.70) * vec3<f32>(mask);
-            // if (mask.x) {
-            //     return vec3<f32>(0.25) + leaf.color;
-            // }
-            // if (mask.y) {
-            //     return vec3<f32>(0.50) + leaf.color;
-            // }
-            // if (mask.z) {
-            //     return vec3<f32>(0.70) + leaf.color;
-            // }
-            // return vec3<f32>(0.3);
+            return leaf.color + dot(vec3(0.25, 0.40, 0.60) * vec3<f32>(mask), vec3(1.0));
         }
 
         // choose which direction is the smallest
@@ -102,8 +111,25 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         var b2 = sideDist.xyz <= sideDist.zxy;
         mask = b1 & b2;
 
+        if i == 0u {
+        ipos += vec3<i32>(mask) * step;
+        leaf = get_vdb_leaf_from_leaf(ipos, leaf);
+
+        switch leaf.num_parents {
+            case 0u: { s = scale[3u]; }
+            case 1u: { s = scale[2u]; }
+            case 2u: { s = scale[1u]; }
+            case 3u: { s = scale[0u]; }
+            default: { s = scale[0u]; }
+        }
+
+        sideDist += vec3<f32>(mask) * deltaDist * f32(s);
+        ipos -= vec3<i32>(mask) * step;
+        ipos += vec3<i32>(mask) * step * s;
+        } else {
         sideDist += vec3<f32>(mask) * deltaDist;
-        ipos += vec3<i32>(mask) * step * 1;
+        ipos += vec3<i32>(mask) * step;
+        }
     }
 
     return vec3<f32>(dir);
@@ -121,6 +147,10 @@ struct VdbLeaf {
     num_parents: u32,
     parents: array<Parent, 3>,
 }
+
+const NODE5_TOTAL_LOG_D: u32 = 12u; // 5 + 4 + 3
+const NODE4_TOTAL_LOG_D: u32 = 7u; // 4 + 3
+const NODE3_TOTAL_LOG_D: u32 = 3u; // 3
 
 fn get_vdb_leaf_from_leaf(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
     var leaf = leaff;
@@ -255,112 +285,6 @@ fn get_vdb_leaf_from_node3(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
         return VdbLeaf(vec3<f32>(0.1), false, 3u, leaf.parents);
     }
     return VdbLeaf(vec3<f32>(0.0), true, 3u, leaf.parents);
-}
-
-const MAX_RAY_STEPS: i32 = 1500;
-fn cast_ray(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    var ipos = vec3<i32>(floor(src));
-    var deltaDist = abs(vec3<f32>(length(dir)) / dir);
-    var step = vec3<i32>(sign(dir));
-    var sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5) + 0.5) * deltaDist;
-    var mask = vec3<bool>(false);
-    var i: i32 = 0;
-    var c = dir;
-
-    for (i = 0; i < MAX_RAY_STEPS; i++) {
-        c = getVdbVoxel(ipos);
-        if (c.x != 0.33) {
-            break;
-        }
-
-        // choose which direction is the smallest
-        var b1 = sideDist.xyz <= sideDist.yzx;
-        var b2 = sideDist.xyz <= sideDist.zxy;
-        mask = b1 & b2;
-
-        sideDist += vec3<f32>(mask) * deltaDist;
-        ipos += vec3<i32>(mask) * step * 1;
-    }
-
-    if (i == MAX_RAY_STEPS) {
-        return vec3<f32>(dir);
-    }
-    if (mask.x) {
-        return vec3<f32>(0.25) + c;
-    }
-    if (mask.y) {
-        return vec3<f32>(0.50) + c;
-    }
-    if (mask.z) {
-        return vec3<f32>(0.70) + c;
-    }
-    return vec3<f32>(0.3);
-}
-
-fn getVoxel(pos: vec3<i32>) -> bool{
-    return ( ( pos.x == pos.z || pos.x == -pos.z ) && pos.y == 0 && (pos.x == 4 || pos.x == 2 || pos.x == 6));
-}
-
-
-const NODE5_TOTAL_LOG_D: u32 = 12u; // 5 + 4 + 3
-const NODE4_TOTAL_LOG_D: u32 = 7u; // 4 + 3
-const NODE3_TOTAL_LOG_D: u32 = 3u; // 3
-
-fn getVdbVoxel(pos: vec3<i32>) -> vec3<f32> {
-    var node5_origin = global_to_node(pos, NODE5_TOTAL_LOG_D);
-
-    for (var node5_idx: u32 =0u; node5_idx < arrayLength(&origins); node5_idx++) {
-        if all(node5_origin == origins[node5_idx]) {
-
-            let node5_local = global_to_local(pos, NODE5_TOTAL_LOG_D);
-            let node5_child = local_to_child_node(node5_local, NODE4_TOTAL_LOG_D);
-            let node5_offset = child_to_offset(node5_child, 5u, 10u);
-
-            let node5_mask_index = node5_offset >> 5u;
-            let node5_mask_pos = node5_offset & 31u;
-            let in_kid5 = bool( kids5[node5_idx].m[node5_mask_index] & ( 1u << node5_mask_pos));
- //           let in_val5 = bool( vals5[node5_idx].m[node5_mask_index] & ( 1u << node5_mask_pos));
-
-
-            if (in_kid5) {
-                let node5_atlas_dim = textureDimensions(node5s).y >> 5u;
-
-                let node5_atlas_origin = 32u * atlas_origin_from_idx(node5_idx, node5_atlas_dim);
-                let node4_idx = textureLoad(node5s, node5_child + node5_atlas_origin, 0).r;
-
-                let node4_local = global_to_local(pos, NODE4_TOTAL_LOG_D);
-                let node4_child = local_to_child_node(node4_local, NODE3_TOTAL_LOG_D);
-                let node4_offset = child_to_offset(node4_child, 4u, 8u);
-
-                let node4_mask_index = node4_offset >> 5u;
-                let node4_mask_pos = node4_offset & 31u;
-                let in_kid4 = bool( kids4[node4_idx].m[node4_mask_index] & ( 1u << node4_mask_pos));
-//                let in_val4 = bool( vals4[node4_idx].m[node4_mask_index] & ( 1u << node4_mask_pos));
-
-                if (in_kid4) {
-                    let node4_atlas_dim = textureDimensions(node4s).x >> 4u;
-                    let node4_atlas_origin = 16u * atlas_origin_from_idx(node4_idx, node4_atlas_dim);
-                    let node3_idx = textureLoad(node4s, node4_child + node4_atlas_origin, 0).r;
-
-                    let node3_local = global_to_local(pos, NODE3_TOTAL_LOG_D);
-                    let node3_offset = child_to_offset(node3_local, 3u, 6u);
-
-                    let node3_mask_index = node3_offset >> 5u;
-                    let node3_mask_pos = node3_offset & 31u;
-                    let in_val3 = bool( vals3[node3_idx].m[node3_mask_index] & ( 1u << node3_mask_pos));
-
-                    if (in_val3) {
-                        return vec3<f32>(0.1);
-                    }
-                    break;
-                }
-                break;
-            }
-            break;
-        }
-    }
-
-    return vec3<f32>(0.33, 0.0, 0.0);
 }
 
 
