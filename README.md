@@ -1,4 +1,5 @@
 # woxel
 Web compatible voxel rendering engine
 
-![](woxel_teapot.png)
+![](photos/woxel_space.png)
+![](photos/woxel_teapot.png) 

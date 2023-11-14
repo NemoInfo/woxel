@@ -1,5 +1,8 @@
+use std::time::Instant;
+
 use egui::{ClippedPrimitive, Color32, FontId, RichText, TexturesDelta};
 use egui_wgpu_backend::ScreenDescriptor;
+use instant::Duration;
 use winit::window::Window;
 
 use crate::scene::Scene;
@@ -9,6 +12,7 @@ pub enum Model {
     Teapot,
     Icosahedron,
     Cube,
+    ISS,
 }
 
 impl Model {
@@ -17,6 +21,7 @@ impl Model {
             Self::Teapot => "teapot".to_string(),
             Self::Icosahedron => "icosahedron".to_string(),
             Self::Cube => "cube".to_string(),
+            Self::ISS => "ISS".to_string(),
         }
     }
 
@@ -25,6 +30,7 @@ impl Model {
             Self::Teapot => "utahteapot",
             Self::Icosahedron => "icosahedron",
             Self::Cube => "cube",
+            Self::ISS => "iss",
         }
     }
 
@@ -33,9 +39,13 @@ impl Model {
     }
 }
 
+const FPS_UPDATE_INTERVAL: Duration = Duration::from_secs(1);
 pub struct EguiDev {
     pub platform: egui_winit_platform::Platform,
     pub model: Model,
+    last_fps_update: Instant,
+    past_fps: Vec<f32>,
+    current_fps: f32,
 }
 
 impl EguiDev {
@@ -43,6 +53,9 @@ impl EguiDev {
         Self {
             platform,
             model: Model::Teapot,
+            last_fps_update: Instant::now(),
+            current_fps: 0.,
+            past_fps: vec![0.0; 30],
         }
     }
 
@@ -51,6 +64,8 @@ impl EguiDev {
         scene: &Scene,
         window: &Window,
     ) -> (TexturesDelta, Vec<ClippedPrimitive>, ScreenDescriptor, bool) {
+        self.update_fps(scene.state.fps);
+
         let screen_descriptor = ScreenDescriptor {
             physical_width: window.inner_size().width,
             physical_height: window.inner_size().height,
@@ -71,7 +86,7 @@ impl EguiDev {
             .resizable(true)
             .show(&self.platform.context(), |ui| {
                 ui.label(
-                    RichText::new(format!("FPS: {:.0}", scene.state.fps))
+                    RichText::new(format!("FPS: {:.0}", self.current_fps))
                         .color(Color32::from_rgb(7, 173, 51))
                         .font(FontId::proportional(20.0)),
                 );
@@ -90,6 +105,25 @@ impl EguiDev {
                     model_changed |= ui
                         .selectable_value(&mut self.model, Model::Cube, Model::Cube.rich_text())
                         .clicked();
+                    model_changed |= ui
+                        .selectable_value(&mut self.model, Model::ISS, Model::ISS.rich_text())
+                        .clicked();
+                });
+
+                ui.label(
+                    RichText::new(format!(
+                        "Camera xyz: {:.2} {:.2} {:.2}",
+                        scene.camera.eye.x, scene.camera.eye.y, scene.camera.eye.z
+                    ))
+                    .font(FontId::proportional(15.0)),
+                );
+
+                ui.horizontal(|ui| {
+                    ui.set_visible(false);
+                    ui.label(
+                        RichText::new("Camera xyz: -1000.00 -1000.00 -1000.00")
+                            .font(FontId::proportional(15.0)),
+                    );
                 });
             });
 
@@ -98,5 +132,17 @@ impl EguiDev {
         let tdelta = full_output.textures_delta;
 
         (tdelta, paint_jobs, screen_descriptor, model_changed)
+    }
+
+    pub fn update_fps(&mut self, fps: f32) {
+        self.past_fps.reverse();
+        self.past_fps.push(fps);
+        self.past_fps.reverse();
+        self.past_fps.pop();
+        let now = Instant::now();
+        if now.duration_since(self.last_fps_update) > FPS_UPDATE_INTERVAL {
+            self.last_fps_update = now;
+            self.current_fps = self.past_fps.iter().sum::<f32>() / self.past_fps.len() as f32;
+        }
     }
 }

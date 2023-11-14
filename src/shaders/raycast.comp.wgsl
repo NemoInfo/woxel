@@ -62,78 +62,61 @@ fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     textureStore(texture, global_id.xy, color);
 }
 
-const HDDA_MAX_RAY_STEPS: u32 = 1000u;
-const scale = array<i32, 4>(1, 8, 128, 4096);
-fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    var ipos = vec3<i32>(floor(src));
-    var deltaDist = abs(vec3<f32>(length(dir)) / dir);
-    var step = vec3<i32>(sign(dir));
-    var mask = vec3<bool>(false);
+fn sign11(p: vec3<f32>) -> vec3<f32>{
+    return vec3(
+        select(1., -1., p.x < 0.),
+        select(1., -1., p.y < 0.),
+        select(1., -1., p.z < 0.),
+    );
+}
 
-    var c = dir;
+fn modulo_vec3f(x: vec3<f32>, y:f32) -> vec3<f32> {
+    return x - y * floor(x / y);
+}
+
+const HDDA_MAX_RAY_STEPS: u32 = 1000u;
+const scale = array<f32, 4>(1., 8., 128., 4096.);
+fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    var p: vec3<f32> = src;
+    let step: vec3<f32> = sign11(dir);
+    let step01: vec3<f32> = max(vec3(0.), step);
+    let idir: vec3<f32> = 1. / dir;
+    var mask = vec3<bool>();
 
     var leaf: VdbLeaf;
-    leaf = get_vdb_leaf_from_nothing(ipos, leaf);
-
-    var sideDist: vec3<f32>;
-    switch leaf.num_parents {
-        case 3u: {
-            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 ) + 0.5 ) * deltaDist;
-        }
-        case 2u: {
-            ipos = global_to_node(ipos, NODE3_TOTAL_LOG_D);
-            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 * 8.0) + 0.5 * 8.0) * deltaDist;
-        }
-        case 1u: {
-            ipos = global_to_node(ipos, NODE4_TOTAL_LOG_D);
-            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 * 8.0 * 16.0) + 0.5 * 8.0 * 16.0) * deltaDist;
-        }
-        case 0u: {
-            ipos = global_to_node(ipos, NODE5_TOTAL_LOG_D);
-            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 * 8.0 * 16.0 * 32.0) + 0.5 * 8.0 * 16.0 * 32.0) * deltaDist;
-        }
-        default: {
-            sideDist = (sign(dir) * (vec3<f32>(ipos) - src) + (sign(dir) * 0.5 ) + 0.5 ) * deltaDist;
-        }
-    }
-
-
-    var s: i32;
-    for(var i: u32 = 0u; i < HDDA_MAX_RAY_STEPS; i++) {
-        leaf = get_vdb_leaf_from_leaf(ipos, leaf);
+    for(var i: u32 = 0u; i < HDDA_MAX_RAY_STEPS; i++){
+        leaf = get_vdb_leaf_from_leaf(vec3<i32>(p), leaf);
 
         if !leaf.empty {
-            return leaf.color + dot(vec3(0.25, 0.40, 0.60) * vec3<f32>(mask), vec3(1.0));
+            // return vec3(0.1) + vec3<f32>(mask) * vec3(0.1, 0.2, 0.3);
+            return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.1, 0.2, 0.3), vec3(1.0));
+        }
+        // HACK: Check for out of bounds!
+        if any(vec3(4096.) < abs(p)) {
+            return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
         }
 
-        // choose which direction is the smallest
-        var b1 = sideDist.xyz <= sideDist.yzx;
-        var b2 = sideDist.xyz <= sideDist.zxy;
+        var size: f32;
+        switch leaf.num_parents {
+            case 3u: { size = scale[0u]; }
+            case 2u: { size = scale[1u]; }
+            case 1u: { size = scale[2u]; }
+            case 0u: { size = scale[3u]; }
+            default: { size = scale[0u]; }
+        }
+
+        var tMax: vec3<f32> = idir * (size * step * step01 - modulo_vec3f(p, size));
+
+        p += min(min(tMax.x, tMax.y), tMax.z) * dir;
+
+        let b1 = tMax.xyz <= tMax.yzx;
+        let b2 = tMax.xyz <= tMax.zxy;
         mask = b1 & b2;
 
-        if i == 0u {
-        ipos += vec3<i32>(mask) * step;
-        leaf = get_vdb_leaf_from_leaf(ipos, leaf);
-
-        switch leaf.num_parents {
-            case 0u: { s = scale[3u]; }
-            case 1u: { s = scale[2u]; }
-            case 2u: { s = scale[1u]; }
-            case 3u: { s = scale[0u]; }
-            default: { s = scale[0u]; }
-        }
-
-        sideDist += vec3<f32>(mask) * deltaDist * f32(s);
-        ipos -= vec3<i32>(mask) * step;
-        ipos += vec3<i32>(mask) * step * s;
-        } else {
-        sideDist += vec3<f32>(mask) * deltaDist;
-        ipos += vec3<i32>(mask) * step;
-        }
+        p += 4e-4 * step * vec3<f32>(mask);
     }
 
     return vec3<f32>(dir);
-
 }
 
 struct Parent {
