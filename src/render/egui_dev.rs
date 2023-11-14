@@ -1,6 +1,8 @@
 use std::time::Instant;
 
+use cgmath::Point3;
 use egui::{ClippedPrimitive, Color32, FontId, RichText, TexturesDelta};
+use egui_plot::{Bar, BarChart, Plot};
 use egui_wgpu_backend::ScreenDescriptor;
 use instant::Duration;
 use winit::window::Window;
@@ -44,6 +46,7 @@ pub struct EguiDev {
     pub platform: egui_winit_platform::Platform,
     pub model: Model,
     last_fps_update: Instant,
+    time_last_frame: Instant,
     past_fps: Vec<f32>,
     current_fps: f32,
 }
@@ -54,8 +57,9 @@ impl EguiDev {
             platform,
             model: Model::Teapot,
             last_fps_update: Instant::now(),
+            time_last_frame: Instant::now(),
             current_fps: 0.,
-            past_fps: vec![0.0; 30],
+            past_fps: vec![0.0; 100],
         }
     }
 
@@ -64,7 +68,7 @@ impl EguiDev {
         scene: &Scene,
         window: &Window,
     ) -> (TexturesDelta, Vec<ClippedPrimitive>, ScreenDescriptor, bool) {
-        self.update_fps(scene.state.fps);
+        self.update_fps();
 
         let screen_descriptor = ScreenDescriptor {
             physical_width: window.inner_size().width,
@@ -118,6 +122,37 @@ impl EguiDev {
                     .font(FontId::proportional(15.0)),
                 );
 
+                ui.label(
+                    RichText::new(format!(
+                        "Facing: {}",
+                        self.facing(scene.camera.eye, scene.camera.target)
+                    ))
+                    .font(FontId::proportional(15.0))
+                    .color(Color32::WHITE),
+                );
+
+                let chart = BarChart::new(
+                    self.past_fps
+                        .iter()
+                        .enumerate()
+                        .map(|(index, &time)| Bar::new(index as f64, time as f64 * 1000.))
+                        .collect(),
+                )
+                .color(Color32::LIGHT_BLUE)
+                .vertical();
+
+                ui.label(RichText::new("dt histogram (μs)").font(FontId::proportional(15.0)));
+                ui.vertical(|ui| {
+                    ui.set_height(10.0);
+                    Plot::new("dt (ms)")
+                        .clamp_grid(true)
+                        .y_axis_width(2)
+                        .allow_zoom(false)
+                        .allow_drag(false)
+                        .show_axes([false, true])
+                        .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+                });
+
                 ui.horizontal(|ui| {
                     ui.set_visible(false);
                     ui.label(
@@ -134,15 +169,35 @@ impl EguiDev {
         (tdelta, paint_jobs, screen_descriptor, model_changed)
     }
 
-    pub fn update_fps(&mut self, fps: f32) {
-        self.past_fps.reverse();
-        self.past_fps.push(fps);
-        self.past_fps.reverse();
-        self.past_fps.pop();
+    fn facing(&self, eye: Point3<f32>, target: Point3<f32>) -> String {
+        let dir = target - eye;
+        let adir = dir.map(|c| c.abs());
+        let yzx = (adir.y, adir.z, adir.x).into();
+        let zxy = (adir.z, adir.x, adir.y).into();
+        let b1 = adir.zip(yzx, |u, v| u >= v);
+        let b2 = adir.zip(zxy, |u, v| u >= v);
+        let bl = b1.zip(b2, |u, v| u && v);
+
+        let neg = ["-", " "];
+        match bl.into() {
+            (true, _, _) => format!("{}X", neg[(dir.x > 0.) as usize]),
+            (_, true, _) => format!("{}Y", neg[(dir.y > 0.) as usize]),
+            (_, _, true) => format!("{}Z", neg[(dir.z > 0.) as usize]),
+            _ => unreachable!(),
+        }
+    }
+
+    fn update_fps(&mut self) {
+        let dt = self.time_last_frame.elapsed().as_secs_f32();
+        self.past_fps.push(dt);
+        self.past_fps.remove(0);
         let now = Instant::now();
         if now.duration_since(self.last_fps_update) > FPS_UPDATE_INTERVAL {
             self.last_fps_update = now;
-            self.current_fps = self.past_fps.iter().sum::<f32>() / self.past_fps.len() as f32;
+            let avg_dt = self.past_fps.iter().sum::<f32>() / self.past_fps.len() as f32;
+            self.current_fps = 1.0 / avg_dt;
         }
+
+        self.time_last_frame = now;
     }
 }
