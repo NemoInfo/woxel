@@ -5,8 +5,14 @@ use std::{
 };
 
 use bitvec::prelude::*;
+
+#[cfg(not(target_arch = "wasm32"))]
 use blosc_src::blosc_cbuffer_sizes;
-use bytemuck::{bytes_of_mut, cast_slice_mut, Zeroable};
+
+#[cfg(not(target_arch = "wasm32"))]
+use bytemuck::Zeroable;
+
+use bytemuck::{bytes_of_mut, cast_slice_mut};
 use byteorder::{LittleEndian, ReadBytesExt};
 use cgmath::Vector3;
 use half::f16;
@@ -321,9 +327,9 @@ impl<R: Read + Seek> VdbReader<R> {
                 );
 
                 for idx in node_4_header.child_mask.iter_ones() {
-                    let mut value_mask = bitvec![u64, Lsb0; 0; <N3<T>>::SIZE];
+                    let mut value_mask = bitvec![u32, Lsb0; 0; <N3<T>>::SIZE];
                     self.reader
-                        .read_u64_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
+                        .read_u32_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
 
                     node_4.data[idx] = InternalData::Node(Box::new(<N3<T>>::new_from_header(
                         try_from_bitvec(value_mask)?,
@@ -352,12 +358,12 @@ impl<R: Read + Seek> VdbReader<R> {
         &mut self,
         grid_descriptor: &GridDescriptor,
     ) -> Result<NodeHeader<T>> {
-        let mut child_mask = bitvec![u64, Lsb0; 0; N::SIZE];
-        let mut value_mask = bitvec![u64, Lsb0; 0; N::SIZE];
+        let mut child_mask = bitvec![u32, Lsb0; 0; N::SIZE];
+        let mut value_mask = bitvec![u32, Lsb0; 0; N::SIZE];
         self.reader
-            .read_u64_into::<LittleEndian>(child_mask.as_raw_mut_slice())?;
+            .read_u32_into::<LittleEndian>(child_mask.as_raw_mut_slice())?;
         self.reader
-            .read_u64_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
+            .read_u32_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
 
         let size = if self.header.file_version < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION {
             child_mask.count_zeros()
@@ -379,7 +385,7 @@ impl<R: Read + Seek> VdbReader<R> {
         &mut self,
         grid_descriptor: &GridDescriptor,
         size: usize,
-        value_mask: &BitSlice<u64>,
+        value_mask: &BitSlice<u32>,
     ) -> Result<Vec<T>> {
         let mut meta_data: NodeMetaData = NodeMetaData::NoMaskAndAllVals;
         if self.header.file_version >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION {
@@ -399,14 +405,14 @@ impl<R: Read + Seek> VdbReader<R> {
             _ => {}
         }
 
-        let mut selection_mask = bitvec![u64, Lsb0; 0; size];
+        let mut selection_mask = bitvec![u32, Lsb0; 0; size];
 
         if meta_data == NodeMetaData::MaskAndNoInactiveVals
             || meta_data == NodeMetaData::MaskAndOneInactiveVal
             || meta_data == NodeMetaData::MaskAndTwoInactiveVals
         {
             self.reader
-                .read_u64_into::<LittleEndian>(selection_mask.as_raw_mut_slice())?;
+                .read_u32_into::<LittleEndian>(selection_mask.as_raw_mut_slice())?;
         }
 
         let count = if grid_descriptor
@@ -507,34 +513,43 @@ impl<R: Read + Seek> VdbReader<R> {
                     let mut blosc_data = vec![0u8; num_compressed_bytes as usize];
                     self.reader.read_exact(&mut blosc_data)?;
                     if count > 0 {
-                        let mut nbytes: usize = 0;
-                        let mut cbytes: usize = 0;
-                        let mut blocksize: usize = 0;
-                        unsafe {
-                            blosc_cbuffer_sizes(
-                                blosc_data.as_ptr().cast(),
-                                &mut nbytes,
-                                &mut cbytes,
-                                &mut blocksize,
-                            )
-                        };
-                        if nbytes == 0 {
-                            return Err(ErrorKind::UnsupportedBloscFormat);
+                        cfg_if::cfg_if! {
+                            if #[cfg(target_arch = "wasm32")] {
+                                todo!();
+                            }
+                            else {
+                                let mut nbytes: usize = 0;
+                                let mut cbytes: usize = 0;
+                                let mut blocksize: usize = 0;
+
+                                unsafe {
+                                    blosc_cbuffer_sizes(
+                                        blosc_data.as_ptr().cast(),
+                                        &mut nbytes,
+                                        &mut cbytes,
+                                        &mut blocksize,
+                                    )
+                                };
+                                if nbytes == 0 {
+                                    return Err(ErrorKind::UnsupportedBloscFormat);
+                                }
+                                let dest_size = nbytes / std::mem::size_of::<T>();
+                                let mut dest: Vec<T> = vec![Zeroable::zeroed(); dest_size];
+                                let error = unsafe {
+                                    blosc_src::blosc_decompress_ctx(
+                                        blosc_data.as_ptr().cast(),
+                                        dest.as_mut_ptr().cast(),
+                                        nbytes,
+                                        1,
+                                    )
+                                };
+                                if error < 1 {
+                                    return Err(ErrorKind::InvalidBloscData);
+                                }
+                                dest
+
+                            }
                         }
-                        let dest_size = nbytes / std::mem::size_of::<T>();
-                        let mut dest: Vec<T> = vec![Zeroable::zeroed(); dest_size];
-                        let error = unsafe {
-                            blosc_src::blosc_decompress_ctx(
-                                blosc_data.as_ptr().cast(),
-                                dest.as_mut_ptr().cast(),
-                                nbytes,
-                                1,
-                            )
-                        };
-                        if error < 1 {
-                            return Err(ErrorKind::InvalidBloscData);
-                        }
-                        dest
                     } else {
                         trace!(
                             "Skipping blosc decompression because of a {}-count read",
@@ -595,9 +610,9 @@ impl<R: Read + Seek> VdbReader<R> {
                         continue;
                     };
 
-                    let mut value_mask = bitvec![u64, Lsb0; 0; <N3<T>>::SIZE];
+                    let mut value_mask = bitvec![u32, Lsb0; 0; <N3<T>>::SIZE];
                     self.reader
-                        .read_u64_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
+                        .read_u32_into::<LittleEndian>(value_mask.as_raw_mut_slice())?;
 
                     if self.header.file_version < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION {
                         let _origin = read_vec3i(&mut self.reader)?;
@@ -690,30 +705,11 @@ impl TryFrom<u8> for NodeMetaData {
     }
 }
 
-trait TryConvertFromBitVec<const LOG2_D: u64> {
-    type Error;
-    fn try_convert(value: BitVec<u64>) -> std::result::Result<Self, Self::Error>
-    where
-        Self: Sized;
-}
-
-impl<const LOG2_D: u64> TryConvertFromBitVec<LOG2_D> for [u64; (1 << (LOG2_D * 3)) / 64] {
-    type Error = ErrorKind;
-
-    fn try_convert(mask: BitVec<u64>) -> Result<Self> {
-        let slice: &[u64] = mask.as_raw_slice();
-        match TryInto::<[u64; (1 << (LOG2_D * 3)) / 64]>::try_into(slice) {
-            Err(_) => Err(ErrorKind::UnexpectedMaskLength),
-            Ok(array) => Ok(array),
-        }
-    }
-}
-
 fn try_from_bitvec<const LOG2_D: u64>(
-    mask: BitVec<u64>,
-) -> Result<[u64; ((1 << (LOG2_D * 3)) / 64) as usize]> {
-    let slice: &[u64] = mask.as_raw_slice();
-    match TryInto::<[u64; ((1 << (LOG2_D * 3)) / 64) as usize]>::try_into(slice) {
+    mask: BitVec<u32>,
+) -> Result<[u32; ((1 << (LOG2_D * 3)) / 32) as usize]> {
+    let slice: &[u32] = mask.as_raw_slice();
+    match TryInto::<[u32; ((1 << (LOG2_D * 3)) / 32) as usize]>::try_into(slice) {
         Err(_) => Err(ErrorKind::UnexpectedMaskLength),
         Ok(array) => Ok(array),
     }

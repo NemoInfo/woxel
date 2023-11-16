@@ -41,7 +41,7 @@ impl NodeAtlas {
             dimension: wgpu::TextureDimension::D3,
             format: wgpu::TextureFormat::R32Uint,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("Atlas Texture"),
+            label: Some("Atlas Texture 5"),
             view_formats: &[],
         });
 
@@ -56,7 +56,7 @@ impl NodeAtlas {
             dimension: wgpu::TextureDimension::D3,
             format: wgpu::TextureFormat::R32Uint,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("Atlas Texture"),
+            label: Some("Atlas Texture 4"),
             view_formats: &[],
         });
 
@@ -71,7 +71,7 @@ impl NodeAtlas {
             dimension: wgpu::TextureDimension::D3,
             format: wgpu::TextureFormat::R32Uint,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("Atlas Texture"),
+            label: Some("Atlas Texture 3"),
             view_formats: &[],
         });
 

@@ -76,7 +76,7 @@ pub trait Node {
 #[derive(Debug)]
 pub struct LeafNode<ValueType, const LOG2_D: u64>
 where
-    [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
+    [(); ((1 << (LOG2_D * 3)) / 32) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
     ValueType: VdbValueType,
 {
@@ -87,13 +87,13 @@ where
     //  mask[offset / 64] & ( 1 << ( offset % 64 ) )
     //                    OR
     //  mask[offset >> 6] & ( 1 << ( offset & 63 ) )
-    pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
+    pub value_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize],
     pub flags: u64,
 }
 
 impl<ValueType, const LOG2_D: u64> Node for LeafNode<ValueType, LOG2_D>
 where
-    [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
+    [(); ((1 << (LOG2_D * 3)) / 32) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
     ValueType: VdbValueType,
 {
@@ -103,15 +103,15 @@ where
 
 impl<ValueType, const LOG2_D: u64> LeafNode<ValueType, LOG2_D>
 where
-    [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
+    [(); ((1 << (LOG2_D * 3)) / 32) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
     ValueType: VdbValueType,
 {
     pub fn new() -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
             std::array::from_fn(|_| LeafData::Offset(0));
-        let value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
-            [0; ((1 << (LOG2_D * 3)) / 64) as usize];
+        let value_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize] =
+            [0; ((1 << (LOG2_D * 3)) / 32) as usize];
         let flags = 0;
 
         Self {
@@ -121,10 +121,10 @@ where
         }
     }
 
-    pub fn new_from_header(value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize]) -> Self {
+    pub fn new_from_header(value_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize]) -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
             std::array::from_fn(|_| LeafData::Offset(0));
-        [0; ((1 << (LOG2_D * 3)) / 64) as usize];
+        [0; ((1 << (LOG2_D * 3)) / 32) as usize];
         let flags = 0;
 
         Self {
@@ -145,18 +145,18 @@ pub enum LeafData<ValueType> {
 pub struct InternalNode<ValueType, ChildType, const LOG2_D: u64>
 where
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
+    [(); ((1 << (LOG2_D * 3)) / 32) as usize]:,
     ChildType: Node,
 {
     pub data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize],
-    pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
-    pub child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
+    pub value_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize],
+    pub child_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize],
     pub origin: [i32; 3],
 }
 
 impl<ValueType, ChildType, const LOG2_D: u64> InternalNode<ValueType, ChildType, LOG2_D>
 where
-    [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
+    [(); ((1 << (LOG2_D * 3)) / 32) as usize]:,
     [(); (1 << (LOG2_D * 3)) as usize]:,
     ValueType: VdbValueType,
     ChildType: Node,
@@ -164,10 +164,10 @@ where
     pub fn new(origin: GlobalCoordinates) -> Self {
         let data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize] =
             std::array::from_fn(|_| InternalData::Tile(ValueType::zeroed()));
-        let value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
-            [0; ((1 << (LOG2_D * 3)) / 64) as usize];
-        let child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
-            [0; ((1 << (LOG2_D * 3)) / 64) as usize];
+        let value_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize] =
+            [0; ((1 << (LOG2_D * 3)) / 32) as usize];
+        let child_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize] =
+            [0; ((1 << (LOG2_D * 3)) / 32) as usize];
         let origin = origin.into();
 
         Self {
@@ -179,8 +179,8 @@ where
     }
 
     pub fn new_from_header(
-        child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
-        value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
+        child_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize],
+        value_mask: [u32; ((1 << (LOG2_D * 3)) / 32) as usize],
         origin: [i32; 3],
     ) -> Self {
         let data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize] =
@@ -198,7 +198,7 @@ where
 impl<ValueType, ChildType, const LOG2_D: u64> Node for InternalNode<ValueType, ChildType, LOG2_D>
 where
     [(); (1 << (LOG2_D * 3)) as usize]:,
-    [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
+    [(); ((1 << (LOG2_D * 3)) / 32) as usize]:,
     ValueType: VdbValueType,
     ChildType: Node,
 {
@@ -365,8 +365,8 @@ pub enum NodeMetaData {
 
 #[derive(Debug)]
 pub struct NodeHeader<ValueType> {
-    pub child_mask: BitVec<u64>,
-    pub value_mask: BitVec<u64>,
+    pub child_mask: BitVec<u32>,
+    pub value_mask: BitVec<u32>,
     pub data: Vec<ValueType>,
     pub log_2_dim: u64,
 }

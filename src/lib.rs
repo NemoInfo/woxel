@@ -85,3 +85,25 @@ pub async fn run() {
     event_loop
         .run(move |event, target, control_flow| runtime.main_loop(event, target, control_flow));
 }
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_futures::JsFuture;
+#[cfg(target_arch = "wasm32")]
+use web_sys::{window, Response};
+#[cfg(target_arch = "wasm32")]
+use std::io::{Cursor, BufReader};
+
+#[cfg(target_arch = "wasm32")]
+pub async fn fetch_data_as_reader(url: &str) -> Result<BufReader<Cursor<Vec<u8>>>, JsValue> {
+    let window = window().unwrap();
+    let response = JsFuture::from(window.fetch_with_str(url)).await?;
+    let response: Response = response.dyn_into().unwrap();
+
+    let array_buffer = JsFuture::from(response.array_buffer()?).await?;
+    let u8_array = js_sys::Uint8Array::new(&array_buffer);
+    let data = u8_array.to_vec();
+
+    Ok(BufReader::new(Cursor::new(data)))
+}

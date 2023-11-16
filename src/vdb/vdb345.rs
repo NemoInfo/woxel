@@ -147,15 +147,15 @@ where
                         continue;
                     };
 
-                    n3_vals.push(arr32_from_arr64(&node3.value_mask));
+                    n3_vals.push(node3.value_mask);
                 }
 
-                n4_vals.push(arr32_from_arr64(&node4.value_mask));
-                n4_kids.push(arr32_from_arr64(&node4.child_mask));
+                n4_vals.push(node4.value_mask);
+                n4_kids.push(node4.child_mask);
             }
 
-            n5_vals.push(arr32_from_arr64(&node5.value_mask));
-            n5_kids.push(arr32_from_arr64(&node5.child_mask));
+            n5_vals.push(node5.value_mask);
+            n5_kids.push(node5.child_mask);
         }
 
         (n5_kids, n5_vals, n4_kids, n4_vals, n3_vals)
@@ -287,17 +287,6 @@ where
         }
         count
     }
-}
-
-fn arr32_from_arr64<const SIZE: usize>(arr: &[u64; SIZE]) -> [u32; SIZE * 2] {
-    let mut result = [0u32; SIZE * 2];
-
-    for (i, num) in arr.iter().enumerate() {
-        result[i * 2] = *num as u32; // Extract the first byte
-        result[i * 2 + 1] = (num >> 32) as u32; // Extract the second byte
-    }
-
-    result
 }
 
 fn closest_power_of_3(n: usize) -> usize {

@@ -4,7 +4,7 @@ use log::warn;
 use wgpu::{BindGroup, BindGroupLayout, Buffer, ShaderModule, Texture};
 use winit::window::Window;
 
-use crate::{render::gpu_types::MaskUniform, scene::Scene, vdb::VdbReader};
+use crate::{render::gpu_types::MaskUniform, scene::Scene, vdb::{VdbReader, VDB345}};
 
 use super::{
     egui_dev::EguiDev,
@@ -93,11 +93,20 @@ impl WgpuContext {
         };
         surface.configure(&device, &config);
 
-        let f = std::fs::File::open("assets/utahteapot.vdb").unwrap();
-        let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
-        let vdb = vdb_reader.read_vdb345_grid::<u32>("ls_utahteapot").unwrap();
+        let vdb: VDB345<u32>;
+        #[cfg(target_arch = "wasm32")]
+        {
+            let buf_reader = crate::fetch_data_as_reader("assets/icosahedron.vdb").await.unwrap();
+            let mut vdb_reader = VdbReader::new(buf_reader).unwrap();
+            vdb = vdb_reader.read_vdb345_grid::<u32>("ls_icosahedron").unwrap()
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let f = std::fs::File::open("assets/utahteapot.vdb").unwrap();
+            let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
+            vdb = vdb_reader.read_vdb345_grid::<u32>("ls_utahteapot").unwrap()
+        }
 
-        println!("Loaded vdb");
         let atlas = vdb.atlas();
 
         let atlas_size = atlas

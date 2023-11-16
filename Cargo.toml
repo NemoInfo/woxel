@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 bitflags = "2.4.0"
 bitvec = "1.0.1"
-blosc-src = "0.2.1"
 bytemuck = { version = "1.14.0", features = ["extern_crate_alloc"] }
 bytemuck_derive = "1.5.0"
 byteorder = "1.5.0"
@@ -32,6 +31,9 @@ tracing = "0.1.37"
 wgpu = "0.17.0"
 winit = "0.28.6"
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+blosc-src = "0.3.0"
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 console_log = "1.0"
@@ -42,7 +44,9 @@ web-sys = { version = "0.3", features = [
     "Document",
     "Element",
     "Window",
+    "Response",
 ]}
+js-sys = "0.3.65"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

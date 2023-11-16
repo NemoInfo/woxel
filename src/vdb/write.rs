@@ -136,11 +136,11 @@ fn write_node5_header<T: VdbValueType>(b: &mut BytesMut, node5: &Box<N5<T>>) {
     b.put_i32(node5.origin[2]);
 
     for word in node5.child_mask {
-        b.put_u64(word);
+        b.put_u32(word);
     }
 
     for word in node5.value_mask {
-        b.put_u64(word);
+        b.put_u32(word);
     }
 
     // Write uncompressed node values, 6 = no compression
@@ -157,11 +157,11 @@ fn write_node5_header<T: VdbValueType>(b: &mut BytesMut, node5: &Box<N5<T>>) {
 
 fn write_node4_header<T: VdbValueType>(b: &mut BytesMut, node4: &Box<N4<T>>) {
     for word in node4.child_mask {
-        b.put_u64(word);
+        b.put_u32(word);
     }
 
     for word in node4.value_mask {
-        b.put_u64(word);
+        b.put_u32(word);
     }
 
     // Write uncompressed node values, 6 = no compression
@@ -178,13 +178,13 @@ fn write_node4_header<T: VdbValueType>(b: &mut BytesMut, node4: &Box<N4<T>>) {
 
 fn write_node3_header<T: VdbValueType>(b: &mut BytesMut, node3: &Box<N3<T>>) {
     for word in node3.value_mask {
-        b.put_u64(word);
+        b.put_u32(word);
     }
 }
 
 fn write_node3_data<T: VdbValueType>(b: &mut BytesMut, node3: &Box<N3<T>>) {
     for word in node3.value_mask {
-        b.put_u64(word);
+        b.put_u32(word);
     }
     // No compression
     b.put_u8(6);
