@@ -23,6 +23,11 @@ python3 -m http.server
 Techincally you can load any `.vdb` model into the engine. Right now, you need to add the new file to an enum in `egui_dev.rs`.<br/>
 I am planning on adding a way to load files straight from the app.
 
+## Screenshots
+![](photos/woxel_space_ray.png) 
+![](photos/woxel_teapot.png) 
+
+
 [^1]: [Ken Museth. 2013. VDB: High-resolution sparse volumes with dynamic topology](https://www.museth.org/Ken/Publications_files/Museth_TOG13.pdf)
 [^2]: The VDB data structure is inherintly generic in shape. To achieve this in Rust I used the nightly `generic_const_expr` feature
 [^3]: [Ken Museth. 2014. Hierarchical digital differential analyzer for efficient ray-marching in OpenVDB.](https://www.museth.org/Ken/Publications_files/Museth_SIG14.pdf)

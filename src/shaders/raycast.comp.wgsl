@@ -13,6 +13,7 @@ struct Ray {
 struct State {
     camera: Camera,
     ray: Ray,
+    render_mode: u32,
 };
 @group(0) @binding(0)
 var<uniform> s: State;
@@ -88,12 +89,45 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         leaf = get_vdb_leaf_from_leaf(vec3<i32>(p), leaf);
 
         if !leaf.empty {
-            // return vec3(0.1) + vec3<f32>(mask) * vec3(0.1, 0.2, 0.3);
-            return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.1, 0.2, 0.3), vec3(1.0));
+            switch s.render_mode {
+            case 0u: {
+                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
+            }
+            case 1u: {
+                return vec3(0.1) + vec3<f32>(mask) * vec3(0.1, 0.2, 0.3);
+            }
+            case 2u: {
+                let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
+                let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
+                let t = f32(i) / f32(500u);
+
+                return mix(color1, color2, t);
+            }
+            default: {
+                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
+            }
+            }
         }
         // HACK: Check for out of bounds!
         if any(vec3(4096.) < abs(p)) {
-            return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
+            switch s.render_mode {
+            case 0u: {
+                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
+            }
+            case 1u: {
+                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
+            }
+            case 2u: {
+                let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
+                let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
+                let t = f32(i) / f32(500u);
+
+                return mix(color1, color2, t) + dot(vec3<f32>(mask) * vec3(0.04, 0.08, 0.12), vec3(1.0));
+            }
+            default: {
+                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
+            }
+            }
         }
 
         var size: f32;

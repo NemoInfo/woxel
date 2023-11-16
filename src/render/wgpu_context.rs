@@ -218,7 +218,7 @@ impl WgpuContext {
             compute_state_buffer_contents,
             compute_state_bind_group,
             compute_state_bind_group_layout,
-        ) = FrameDescriptor::create_compute_state_binding(&scene.camera, self.size, &self.device);
+        ) = FrameDescriptor::create_compute_state_binding(&scene.camera, self.size, &self.device, self.egui_dev.render_mode);
 
         let (state_buffer, state_buffer_contents, state_bind_group, state_bind_group_layout) =
             FrameDescriptor::create_screen_state_binding(&self.device, &scene.state);

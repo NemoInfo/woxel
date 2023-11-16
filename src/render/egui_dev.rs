@@ -41,10 +41,32 @@ impl Model {
     }
 }
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum RenderMode {
+    Gray,
+    Rgb,
+    Ray,
+}
+
+impl RenderMode {
+    fn text(&self) -> String {
+        String::from(match &self {
+            Self::Gray => "Gray",
+            Self::Rgb => "Rgb",
+            Self::Ray => "Ray",
+        })
+    }
+
+    fn rich_text(&self) -> RichText {
+        RichText::new(self.text()).font(FontId::proportional(15.0))
+    }
+}
+
 const FPS_UPDATE_INTERVAL: Duration = Duration::from_secs(1);
 pub struct EguiDev {
     pub platform: egui_winit_platform::Platform,
     pub model: Model,
+    pub render_mode: RenderMode,
     last_fps_update: Instant,
     time_last_frame: Instant,
     past_fps: Vec<f32>,
@@ -56,10 +78,11 @@ impl EguiDev {
         Self {
             platform,
             model: Model::Teapot,
+            render_mode: RenderMode::Gray,
             last_fps_update: Instant::now(),
             time_last_frame: Instant::now(),
             current_fps: 0.,
-            past_fps: vec![0.0; 100],
+            past_fps: vec![0.0; 200],
         }
     }
 
@@ -138,7 +161,7 @@ impl EguiDev {
                         .map(|(index, &time)| Bar::new(index as f64, time as f64 * 1000.))
                         .collect(),
                 )
-                .color(Color32::LIGHT_BLUE)
+                .color(Color32::LIGHT_GREEN)
                 .vertical();
 
                 ui.label(RichText::new("dt histogram (μs)").font(FontId::proportional(15.0)));
@@ -149,7 +172,7 @@ impl EguiDev {
                         .y_axis_width(2)
                         .allow_zoom(false)
                         .allow_drag(false)
-                        .show_axes([false, true])
+                        .include_y(20.0)
                         .show(ui, |plot_ui| plot_ui.bar_chart(chart));
                 });
 
@@ -159,6 +182,28 @@ impl EguiDev {
                         RichText::new("Camera xyz: -1000.00 -1000.00 -1000.00")
                             .font(FontId::proportional(15.0)),
                     );
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Render: ").font(FontId::proportional(15.0)));
+                    ui.selectable_value(
+                        &mut self.render_mode,
+                        RenderMode::Gray,
+                        RenderMode::Gray.rich_text(),
+                    )
+                    .clicked();
+                    ui.selectable_value(
+                        &mut self.render_mode,
+                        RenderMode::Rgb,
+                        RenderMode::Rgb.rich_text(),
+                    )
+                    .clicked();
+                    ui.selectable_value(
+                        &mut self.render_mode,
+                        RenderMode::Ray,
+                        RenderMode::Ray.rich_text(),
+                    )
+                    .clicked();
                 });
             });
 

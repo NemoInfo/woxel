@@ -1,4 +1,4 @@
-use crate::render::{gpu_types::GpuUniform, Camera};
+use crate::render::{egui_dev::RenderMode, gpu_types::GpuUniform, Camera};
 use bytemuck_derive::{Pod, Zeroable};
 use cgmath::SquareMatrix;
 use wgpu::{util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Device};
@@ -18,6 +18,7 @@ pub struct ComputeState {
     mv: [f32; 4],
     // w' = (-width / 2) u + (height / 2) v - ((height / 2) / tan(fov * 0.5)) w
     wp: [f32; 4],
+    render_mode: [u32; 4],
 }
 
 impl GpuUniform for ComputeState {
@@ -76,7 +77,7 @@ impl ComputeState {
         })
     }
 
-    pub fn build(c: &Camera, resolution_width: f32) -> Self {
+    pub fn build(c: &Camera, resolution_width: f32, render_mode: RenderMode) -> Self {
         let view_proj = c.build_view_projection_matrix();
         let camera_to_world = match view_proj.invert() {
             Some(c) => c,
@@ -90,6 +91,7 @@ impl ComputeState {
         let wp = (-resolution_width / 2.0) * u + (height / 2.0) * v
             - w * (height / 2.0) / (c.fovy.to_radians() * 0.5).tan();
         let mv = -v;
+        let render_mode = [render_mode as u32, 0, 0, 0];
 
         Self {
             view_projection: view_proj.into(),
@@ -98,6 +100,7 @@ impl ComputeState {
             u: u.into(),
             mv: mv.into(),
             wp: wp.into(),
+            render_mode,
         }
     }
 }
