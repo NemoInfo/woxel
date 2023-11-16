@@ -7,7 +7,7 @@ use winit::window::Window;
 use crate::{render::gpu_types::MaskUniform, scene::Scene, vdb::VdbReader};
 
 use super::{
-    egui_dev::EguiDev,
+    egui_dev::{EguiDev, VdbFile},
     frame_descriptor::FrameDescriptor,
     pipelines::{CPipeline, ComputePipeline, Pipeline, VoxelPipeline},
 };
@@ -160,7 +160,9 @@ impl WgpuContext {
                 style: Default::default(),
             });
 
-        let egui_dev = EguiDev::new(egui_platform);
+        // HACK: This is kind of ugly
+        let mut egui_dev = EguiDev::new(egui_platform);
+        egui_dev.selected_model = egui_dev.models.binary_search_by_key(&"utahteapot".to_string(), |x| x.name.clone()).unwrap();
 
         let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
 
@@ -335,7 +337,7 @@ impl WgpuContext {
             .expect("remove textures ok");
 
         if model_changed {
-            self.change_vdb_model(self.egui_dev.model.file());
+            self.change_vdb_model(self.egui_dev.models[self.egui_dev.selected_model].clone());
         }
 
         Ok(())
@@ -355,12 +357,12 @@ impl WgpuContext {
             .unwrap_or_else(|| panic!("No shader with name '{name}'"))
     }
 
-    pub fn change_vdb_model(&mut self, name: &'static str) {
-        let f = std::fs::File::open(format!("assets/{name}.vdb")).unwrap();
+    pub fn change_vdb_model(&mut self, model: VdbFile) {
+        let f = std::fs::File::open(model.path).unwrap();
         let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
         // TODO: Display vdb options and read accordingly
         let vdb = vdb_reader
-            .read_vdb345_grid::<u32>(&format!("ls_{name}"))
+            .read_vdb345_grid::<u32>(&model.grid)
             .unwrap();
 
         let atlas = vdb.atlas();

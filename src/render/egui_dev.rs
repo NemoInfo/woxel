@@ -1,45 +1,13 @@
-use std::time::Instant;
+use std::{fs, time::Instant};
 
 use cgmath::Point3;
-use egui::{ClippedPrimitive, Color32, FontId, RichText, TexturesDelta};
+use egui::{ClippedPrimitive, Color32, ComboBox, FontId, RichText, TexturesDelta};
 use egui_plot::{Bar, BarChart, Plot};
 use egui_wgpu_backend::ScreenDescriptor;
 use instant::Duration;
 use winit::window::Window;
 
 use crate::scene::Scene;
-
-#[derive(PartialEq)]
-pub enum Model {
-    Teapot,
-    Icosahedron,
-    Cube,
-    ISS,
-}
-
-impl Model {
-    fn text(&self) -> String {
-        match &self {
-            Self::Teapot => "teapot".to_string(),
-            Self::Icosahedron => "icosahedron".to_string(),
-            Self::Cube => "cube".to_string(),
-            Self::ISS => "ISS".to_string(),
-        }
-    }
-
-    pub fn file(&self) -> &'static str {
-        match &self {
-            Self::Teapot => "utahteapot",
-            Self::Icosahedron => "icosahedron",
-            Self::Cube => "cube",
-            Self::ISS => "iss",
-        }
-    }
-
-    fn rich_text(&self) -> RichText {
-        RichText::new(self.text()).font(FontId::proportional(15.0))
-    }
-}
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum RenderMode {
@@ -65,8 +33,9 @@ impl RenderMode {
 const FPS_UPDATE_INTERVAL: Duration = Duration::from_secs(1);
 pub struct EguiDev {
     pub platform: egui_winit_platform::Platform,
-    pub model: Model,
+    pub selected_model: usize,
     pub render_mode: RenderMode,
+    pub models: Vec<VdbFile>,
     last_fps_update: Instant,
     time_last_frame: Instant,
     past_fps: Vec<f32>,
@@ -77,7 +46,8 @@ impl EguiDev {
     pub fn new(platform: egui_winit_platform::Platform) -> Self {
         Self {
             platform,
-            model: Model::Teapot,
+            selected_model: 0,
+            models: get_available_vdbs(),
             render_mode: RenderMode::Gray,
             last_fps_update: Instant::now(),
             time_last_frame: Instant::now(),
@@ -118,23 +88,23 @@ impl EguiDev {
                         .font(FontId::proportional(20.0)),
                 );
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Model: ").font(FontId::proportional(15.0)));
-                    model_changed = ui
-                        .selectable_value(&mut self.model, Model::Teapot, Model::Teapot.rich_text())
-                        .clicked();
-                    model_changed |= ui
-                        .selectable_value(
-                            &mut self.model,
-                            Model::Icosahedron,
-                            Model::Icosahedron.rich_text(),
+                    ComboBox::from_label(RichText::new("Model").font(FontId::proportional(15.0)))
+                        .selected_text(
+                            RichText::new(self.models[self.selected_model].name.clone())
+                                .font(FontId::proportional(15.0)),
                         )
-                        .clicked();
-                    model_changed |= ui
-                        .selectable_value(&mut self.model, Model::Cube, Model::Cube.rich_text())
-                        .clicked();
-                    model_changed |= ui
-                        .selectable_value(&mut self.model, Model::ISS, Model::ISS.rich_text())
-                        .clicked();
+                        .width(150.0)
+                        .show_ui(ui, |ui| {
+                            for (id, model) in self.models.iter().enumerate() {
+                                model_changed |= ui
+                                    .selectable_value(
+                                        &mut self.selected_model,
+                                        id,
+                                        RichText::new(&model.name).font(FontId::proportional(15.0)),
+                                    )
+                                    .clicked();
+                            }
+                        });
                 });
 
                 ui.label(
@@ -245,4 +215,47 @@ impl EguiDev {
 
         self.time_last_frame = now;
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct VdbFile {
+    pub name: String,
+    pub path: String,
+    pub grid: String,
+}
+
+fn get_available_vdbs() -> Vec<VdbFile> {
+    let mut files = vec![];
+    let path = "assets";
+
+    for entry in fs::read_dir(path).unwrap() {
+        let Ok(entry) = entry else { continue };
+        let path = entry.path();
+
+        if path.is_file() {
+            let Some(extention) = path.extension() else {
+                continue;
+            };
+            if extention != "vdb" {
+                continue;
+            }
+
+            let Some(name) = path.file_stem() else {
+                continue;
+            };
+            let Some(name) = name.to_str() else {
+                continue;
+            };
+
+            files.push(VdbFile {
+                name: name.to_string(),
+                path: path.display().to_string(),
+                grid: "ls_".to_string() + &name.to_string(),
+            });
+        }
+    }
+
+    files.sort_by(|x, y| x.name.cmp(&y.grid));
+
+    files
 }
