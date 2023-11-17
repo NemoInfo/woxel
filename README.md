@@ -20,8 +20,8 @@ python3 -m http.server
 ```
 
 ## Use
-Techincally you can load any `.vdb` model into the engine. Right now, you need to add the new file to an enum in `egui_dev.rs`.<br/>
-I am planning on adding a way to load files straight from the app.
+You can load any `.vdb` model into the engine by adding it to the `assets/` folder.<br/> 
+Then, on the dev pannel just select it from the dropdown menu. 
 
 ## Screenshots
 ![](photos/woxel_space_ray.png) 
