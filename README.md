@@ -29,5 +29,5 @@ Then, on the dev pannel just select it from the dropdown menu.
 
 
 [^1]: [Ken Museth. 2013. VDB: High-resolution sparse volumes with dynamic topology](https://www.museth.org/Ken/Publications_files/Museth_TOG13.pdf)
-[^2]: The VDB data structure is inherintly generic in shape. To achieve this in Rust I used the nightly `generic_const_expr` feature
+[^2]: The VDB data structure is inherintly generic in shape. To achieve this in Rust I used the nightly [generic_const_expr](https://doc.rust-lang.org/beta/unstable-book/language-features/generic-const-exprs.html) feature
 [^3]: [Ken Museth. 2014. Hierarchical digital differential analyzer for efficient ray-marching in OpenVDB.](https://www.museth.org/Ken/Publications_files/Museth_SIG14.pdf)
