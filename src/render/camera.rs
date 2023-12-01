@@ -182,7 +182,7 @@ impl CameraController {
             + (camera.target + d - camera.eye).normalize()
                 * (camera.target - camera.eye).magnitude();
 
-        let y = Vector3::new(0.0f32, 1.0, 0.0);
+        let y = Vector3::new(0.0, 1.0, 0.0);
         let v = camera.target - camera.eye;
         let alpha = y.angle(v).0.to_degrees();
         let beta = (-y).angle(v).0.to_degrees();

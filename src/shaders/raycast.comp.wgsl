@@ -147,6 +147,7 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         let b2 = tMax.xyz <= tMax.zxy;
         mask = b1 & b2;
 
+        // HACK: sussy bacca code right here.
         p += 4e-4 * step * vec3<f32>(mask);
     }
 
@@ -181,7 +182,7 @@ fn get_vdb_leaf_from_leaf(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
             return get_vdb_leaf_from_node4(pos, leaf);
         }
         let node5_global = global_to_node(pos, NODE5_TOTAL_LOG_D);
-        if all(leaf.parents[0].origin == node4_global) {
+        if all(leaf.parents[0].origin == node5_global) {
             return get_vdb_leaf_from_node5(pos, leaf);
         }
         return get_vdb_leaf_from_nothing(pos, leaf);
@@ -192,7 +193,7 @@ fn get_vdb_leaf_from_leaf(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
             return get_vdb_leaf_from_node4(pos, leaf);
         }
         let node5_global = global_to_node(pos, NODE5_TOTAL_LOG_D);
-        if all(leaf.parents[0].origin == node4_global) {
+        if all(leaf.parents[0].origin == node5_global) {
             return get_vdb_leaf_from_node5(pos, leaf);
         }
         return get_vdb_leaf_from_nothing(pos, leaf);
@@ -306,17 +307,17 @@ fn get_vdb_leaf_from_node3(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
 
 
 fn global_to_node(pos: vec3<i32>, total_log_d: u32) -> vec3<i32> {
-    // This are the global coordinates of a node that contains position
+    // Global coordinates of a node that contains position
     return (pos >> total_log_d) << total_log_d;
 }
 
 fn global_to_local(pos: vec3<i32>, total_log_d: u32) -> vec3<u32> {
-    // This are the relative coordinates of a voxel inside of a node
+    // Relative coordinates of a voxel inside of a node
     return vec3<u32>(pos & ((1 << total_log_d) - 1));
 }
 
 fn local_to_child_node(pos: vec3<u32>, child_total_log_d: u32) -> vec3<u32> {
-    // This are the relative coordinates of a child inside of a node
+    // Relative coordinates of a child inside of a node
     return pos >> child_total_log_d;
 }
 
