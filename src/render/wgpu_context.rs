@@ -160,8 +160,8 @@ impl WgpuContext {
                 style: Default::default(),
             });
 
-        // HACK: This is kind of ugly
         let mut egui_dev = EguiDev::new(egui_platform);
+        // @HACK: This is kind of ugly
         egui_dev.selected_model = egui_dev.models.binary_search_by_key(&"utahteapot".to_string(), |x| x.name.clone()).unwrap();
 
         let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
@@ -308,7 +308,15 @@ impl WgpuContext {
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
 
-        let (tdelta, paint_jobs, screen_descriptor, model_changed) = self.egui_dev.get_frame(scene, window);
+        let (tdelta, paint_jobs, screen_descriptor, model_changed, reload_shaders) = self.egui_dev.get_frame(scene, window);
+
+        // @HACK: refactor egui out and get shader from context
+        if reload_shaders {
+            match std::fs::read_to_string("src/shaders/raycast.comp.wgsl") {
+                Ok(source) => self.reload_shader("raycast.comp", source),
+                Err(e) => panic!("Compute shaders missing {e}"),
+            }
+        }
 
         self.egui_rpass
             .add_textures(&self.device, &self.queue, &tdelta)
@@ -343,13 +351,25 @@ impl WgpuContext {
         Ok(())
     }
 
+    /// Loads shaders at compile time
     pub fn add_shader(&mut self, name: &'static str, source: &'static str) {
         if self.shaders.contains_key(name) {
             panic!("Shader with name '{name}' already exists");
         }
+        let shader = crate::render::Shader::new(name, source.to_string());
+        self.shaders.insert(name, shader.bind(&self.device));
+    }
+
+    /// Reloads pre existiong shaders at run-time
+    pub fn reload_shader(&mut self, name: &'static str, source: String) {
+        if !self.shaders.contains_key(name) {
+            panic!("Shader with name '{name}' doesn't exist");
+        }
         let shader = crate::render::Shader::new(name, source);
         self.shaders.insert(name, shader.bind(&self.device));
     }
+
+
 
     pub fn get_shader(&self, name: &'static str) -> &ShaderModule {
         self.shaders

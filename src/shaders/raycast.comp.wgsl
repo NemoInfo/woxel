@@ -72,14 +72,14 @@ fn sign11(p: vec3<f32>) -> vec3<f32>{
 }
 
 fn modulo_vec3f(x: vec3<f32>, y:f32) -> vec3<f32> {
-    return x - y * floor(x / y);
+    return x - y * floor(x / y); 
 }
 
 const HDDA_MAX_RAY_STEPS: u32 = 1000u;
 const scale = array<f32, 4>(1., 8., 128., 4096.);
 fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     var p: vec3<f32> = src;
-    let step: vec3<f32> = sign11(dir);
+    let step: vec3<f32> = sign(dir);
     let step01: vec3<f32> = max(vec3(0.), step);
     let idir: vec3<f32> = 1. / dir;
     var mask = vec3<bool>();
@@ -90,13 +90,13 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 
         if !leaf.empty {
             switch s.render_mode {
-            case 0u: {
+            case 0u: { // Default
                 return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
             }
-            case 1u: {
+            case 1u: { // Rgb
                 return vec3(0.1) + vec3<f32>(mask) * vec3(0.1, 0.2, 0.3);
             }
-            case 2u: {
+            case 2u: { // Ray length
                 let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
                 let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
                 let t = f32(i) / f32(500u);
@@ -139,7 +139,7 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             default: { size = scale[0u]; }
         }
 
-        var tMax: vec3<f32> = idir * (size * step * step01 - modulo_vec3f(p, size));
+        var tMax: vec3<f32> = idir * (size * step01 - modulo_vec3f(p, size));
 
         p += min(min(tMax.x, tMax.y), tMax.z) * dir;
 
@@ -148,6 +148,7 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         mask = b1 & b2;
 
         // HACK: sussy bacca code right here.
+        // What about "corner" cases?
         p += 4e-4 * step * vec3<f32>(mask);
     }
 

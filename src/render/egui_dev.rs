@@ -60,7 +60,13 @@ impl EguiDev {
         &mut self,
         scene: &Scene,
         window: &Window,
-    ) -> (TexturesDelta, Vec<ClippedPrimitive>, ScreenDescriptor, bool) {
+    ) -> (
+        TexturesDelta,
+        Vec<ClippedPrimitive>,
+        ScreenDescriptor,
+        bool,
+        bool,
+    ) {
         self.update_fps();
 
         let screen_descriptor = ScreenDescriptor {
@@ -78,6 +84,7 @@ impl EguiDev {
             });
 
         let mut model_changed = false;
+        let mut reload_shaders = false;
         egui::Window::new("Developer tools")
             .title_bar(false)
             .resizable(true)
@@ -175,13 +182,23 @@ impl EguiDev {
                     )
                     .clicked();
                 });
+
+                reload_shaders = ui
+                    .button(RichText::new("Reload shaders").font(FontId::proportional(15.0)))
+                    .clicked();
             });
 
         let full_output = self.platform.end_frame(Some(&window));
         let paint_jobs = self.platform.context().tessellate(full_output.shapes);
         let tdelta = full_output.textures_delta;
 
-        (tdelta, paint_jobs, screen_descriptor, model_changed)
+        (
+            tdelta,
+            paint_jobs,
+            screen_descriptor,
+            model_changed,
+            reload_shaders,
+        )
     }
 
     fn facing(&self, eye: Point3<f32>, target: Point3<f32>) -> String {
