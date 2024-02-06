@@ -88,7 +88,7 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 
     var leaf: VdbLeaf;
     for(var i: u32 = 0u; i < HDDA_MAX_RAY_STEPS; i++){
-        leaf = get_vdb_leaf_from_leaf(vec3<i32>(p), leaf);
+        leaf = get_vdb_leaf_from_leaf(vec3<i32>(floor(p)), leaf);
 
         // Render Intersected voxel
         if !leaf.empty {
