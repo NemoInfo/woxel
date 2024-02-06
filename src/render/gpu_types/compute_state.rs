@@ -19,6 +19,7 @@ pub struct ComputeState {
     // w' = (-width / 2) u + (height / 2) v - ((height / 2) / tan(fov * 0.5)) w
     wp: [f32; 4],
     render_mode: [u32; 4],
+    show_345: [u32; 4],
 }
 
 impl GpuUniform for ComputeState {
@@ -77,7 +78,12 @@ impl ComputeState {
         })
     }
 
-    pub fn build(c: &Camera, resolution_width: f32, render_mode: RenderMode) -> Self {
+    pub fn build(
+        c: &Camera,
+        resolution_width: f32,
+        render_mode: RenderMode,
+        show_grid: [bool; 3],
+    ) -> Self {
         let view_proj = c.build_view_projection_matrix();
         let camera_to_world = match view_proj.invert() {
             Some(c) => c,
@@ -92,6 +98,8 @@ impl ComputeState {
             - w * (height / 2.0) / (c.fovy.to_radians() * 0.5).tan();
         let mv = -v;
         let render_mode = [render_mode as u32, 0, 0, 0];
+        let show_grid = show_grid.map(|x| x as u32);
+        let show_345 = [show_grid[0], show_grid[1], show_grid[2], 0];
 
         Self {
             view_projection: view_proj.into(),
@@ -101,6 +109,7 @@ impl ComputeState {
             mv: mv.into(),
             wp: wp.into(),
             render_mode,
+            show_345,
         }
     }
 }

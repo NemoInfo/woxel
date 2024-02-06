@@ -1,13 +1,12 @@
 use std::{fs, time::Instant};
 
+use crate::scene::Scene;
 use cgmath::Point3;
 use egui::{ClippedPrimitive, Color32, ComboBox, FontId, RichText, TexturesDelta};
 use egui_plot::{Bar, BarChart, Plot};
 use egui_wgpu_backend::ScreenDescriptor;
 use instant::Duration;
 use winit::window::Window;
-
-use crate::scene::Scene;
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum RenderMode {
@@ -35,6 +34,7 @@ pub struct EguiDev {
     pub platform: egui_winit_platform::Platform,
     pub selected_model: usize,
     pub render_mode: RenderMode,
+    pub show_grid: [bool; 3],
     pub models: Vec<VdbFile>,
     last_fps_update: Instant,
     time_last_frame: Instant,
@@ -49,6 +49,7 @@ impl EguiDev {
             selected_model: 0,
             models: get_available_vdbs(),
             render_mode: RenderMode::Gray,
+            show_grid: [false; 3],
             last_fps_update: Instant::now(),
             time_last_frame: Instant::now(),
             current_fps: 0.,
@@ -181,6 +182,25 @@ impl EguiDev {
                         RenderMode::Ray.rich_text(),
                     )
                     .clicked();
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Show grid: ").font(FontId::proportional(15.0)));
+
+                    ui.checkbox(
+                        &mut self.show_grid[0],
+                        RichText::new("Node 3").font(FontId::proportional(15.0)),
+                    );
+
+                    ui.checkbox(
+                        &mut self.show_grid[1],
+                        RichText::new("Node 4").font(FontId::proportional(15.0)),
+                    );
+
+                    ui.checkbox(
+                        &mut self.show_grid[2],
+                        RichText::new("Node 5").font(FontId::proportional(15.0)),
+                    );
                 });
 
                 reload_shaders = ui

@@ -14,7 +14,9 @@ struct State {
     camera: Camera,
     ray: Ray,
     render_mode: u32,
+    show_345: vec3<u32>,
 };
+
 @group(0) @binding(0)
 var<uniform> s: State;
 
@@ -79,7 +81,7 @@ const HDDA_MAX_RAY_STEPS: u32 = 1000u;
 const scale = array<f32, 4>(1., 8., 128., 4096.);
 fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     var p: vec3<f32> = src;
-    let step: vec3<f32> = sign(dir);
+    let step: vec3<f32> = sign11(dir);
     let step01: vec3<f32> = max(vec3(0.), step);
     let idir: vec3<f32> = 1. / dir;
     var mask = vec3<bool>();
@@ -88,27 +90,40 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     for(var i: u32 = 0u; i < HDDA_MAX_RAY_STEPS; i++){
         leaf = get_vdb_leaf_from_leaf(vec3<i32>(p), leaf);
 
+        // Render Intersected voxel
         if !leaf.empty {
+            var grid = vec3<f32>(0.0);
+            if s.show_345[2] == 1u && any(floor(p) % 4096. == 0.) {
+                grid = vec3<f32>(-0.3, -0.3, 1.0);
+            }
+            else if s.show_345[1] == 1u && any(floor(p) % 128. == 0.) {
+                grid = vec3<f32>(-0.1, 0.0, 0.8);
+            }
+            else if s.show_345[0] == 1u && any(floor(p) % 8. == 0.) {
+                grid = vec3<f32>(-0.1, 0.5, 0.3);
+            }
+
             switch s.render_mode {
             case 0u: { // Default
-                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
+                return grid + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
             }
             case 1u: { // Rgb
-                return vec3(0.1) + vec3<f32>(mask) * vec3(0.1, 0.2, 0.3);
+                return grid + vec3(0.1) + vec3<f32>(mask) * vec3(0.1, 0.2, 0.3);
             }
             case 2u: { // Ray length
                 let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
                 let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
                 let t = f32(i) / f32(500u);
 
-                return mix(color1, color2, t);
+                return grid + mix(color1, color2, t);
             }
             default: {
-                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
+                return grid + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
             }
             }
         }
-        // HACK: Check for out of bounds!
+
+        // @HACK: Check for out of bounds!
         if any(vec3(4096.) < abs(p)) {
             switch s.render_mode {
             case 0u: {

@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::{
-    egui_dev::RenderMode,
+    egui_dev::EguiDev,
     gpu_types::{
         ComputeOutputTexture, FragmentTexture, GpuPrimitive, GpuQuad, GpuTexture, NodeAtlas,
         StateUniform, GPU_QUAD,
@@ -43,9 +43,15 @@ impl FrameDescriptor {
         camera: &Camera,
         size: PhysicalSize<u32>,
         device: &Device,
-        render_mode: RenderMode,
+        egui_dev: &EguiDev,
     ) -> (Buffer, Vec<u8>, BindGroup, BindGroupLayout) {
-        ComputeState::build(camera, size.width as f32, render_mode).bind(device)
+        ComputeState::build(
+            camera,
+            size.width as f32,
+            egui_dev.render_mode,
+            egui_dev.show_grid,
+        )
+        .bind(device)
     }
 
     pub fn create_vertex_buffer(&self, device: &Device) -> Buffer {
