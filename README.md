@@ -2,7 +2,7 @@
 Web compatible voxel rendering engine. <br/>
 The engine uses the VDB345[^1] data structure. It then performs HDDA[^3] in compute shaders to render the model.
 
-![](photos/woxel_space.png)
+![](photos/woxel_dragon.png) 
 
 ## Instalation
 To run the project you will need the Rust nightly toolchain `1.75.0-nightly`[^2].
@@ -26,6 +26,7 @@ Then, on the dev pannel just select it from the dropdown menu.
 ## Screenshots
 ![](photos/woxel_space_ray.png) 
 ![](photos/woxel_teapot.png) 
+![](photos/woxel_space.png)
 
 
 [^1]: [Ken Museth. 2013. VDB: High-resolution sparse volumes with dynamic topology](https://www.museth.org/Ken/Publications_files/Museth_TOG13.pdf)
