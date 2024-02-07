@@ -61,7 +61,7 @@ var<storage, read> origins: array<vec3<i32>>;
 fn cp_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var p = vec2<f32>(global_id.xy) + vec2(0.001);
     var ray_dir = normalize((p.x * s.ray.u + p.y * s.ray.mv + s.ray.wp).xyz);
-    var color = vec4(hdda(s.camera.eye, ray_dir),1.0);
+    var color = vec4(ray_trace(s.camera.eye, ray_dir),1.0);
     var val = textureLoad(node5s, vec3<i32>(0, 0, 0), 0);
 
     textureStore(texture, global_id.xy, color);
@@ -84,7 +84,9 @@ const k_d: f32 = 0.7;
 
 const HDDA_MAX_RAY_STEPS: u32 = 1000u;
 const scale = array<f32, 4>(1., 8., 128., 4096.);
-fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+
+
+fn hdda_ray(src: vec3<f32>, dir: vec3<f32>) -> HDDAout {
     var p: vec3<f32> = src;
     let step: vec3<f32> = sign11(dir);
     let step01: vec3<f32> = max(vec3(0.), step);
@@ -95,63 +97,14 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     for(var i: u32 = 0u; i < HDDA_MAX_RAY_STEPS; i++){
         leaf = get_vdb_leaf_from_leaf(vec3<i32>(floor(p)), leaf);
 
-        // Render Intersected voxel
+        // Return intersected voxel
         if !leaf.empty {
-            var grid = vec3<f32>(0.0);
-            if s.show_345[2] == 1u && any(floor(p) % 4096. == 0.) {
-                grid = vec3<f32>(-0.3, -0.3, 1.0);
-            }
-            else if s.show_345[1] == 1u && any(floor(p) % 128. == 0.) {
-                grid = vec3<f32>(-0.1, 0.0, 0.8);
-            }
-            else if s.show_345[0] == 1u && any(floor(p) % 8. == 0.) {
-                grid = vec3<f32>(-0.1, 0.5, 0.3);
-            }
-
-            switch s.render_mode {
-            case 0u: { // Default
-                return grid + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
-            }
-            case 1u: { // Rgb
-                return grid + vec3(0.1) + vec3<f32>(mask) * vec3(0.1, 0.2, 0.3);
-            }
-            case 2u: { // Ray length
-                let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
-                let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
-                let t = f32(i) / f32(500u);
-
-                return grid + mix(color1, color2, t);
-            }
-            case 3u {
-                let I = s.sun_color.a * k_d * dot(s.sun_dir, normalize(step * vec3<f32>(mask)));
-                return vec3(0.1) + I * s.sun_color.xyz;
-            }
-            default: {
-                return grid + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
-            }
-            }
+            return HDDAout(0u, leaf, p, mask, i);
         }
 
         // @HACK: Check for out of bounds!
         if any(vec3(4096.) < abs(p)) {
-            switch s.render_mode {
-            case 0u: {
-                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
-            }
-            case 1u: {
-                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
-            }
-            case 2u: {
-                let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
-                let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
-                let t = f32(i) / f32(500u);
-
-                return mix(color1, color2, t) + dot(vec3<f32>(mask) * vec3(0.04, 0.08, 0.12), vec3(1.0));
-            }
-            default: {
-                return vec3(0.0) + dot(vec3<f32>(mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
-            }
-            }
+            return HDDAout(1u, leaf, p, mask, i);
         }
 
         var size: f32;
@@ -171,9 +124,95 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         let b2 = tMax.xyz <= tMax.zxy;
         mask = b1 & b2;
 
-        // HACK: sussy bacca code right here.
-        // What about "corner" cases?
         p += 4e-4 * step * vec3<f32>(mask);
+    }
+
+    return HDDAout(2u, leaf, p, mask, HDDA_MAX_RAY_STEPS);
+}
+
+struct HDDAout {
+    // State
+    //  0 => Intersection found
+    //  1 => Out of Bounds
+    //  2 => Max rays exceeded
+    state: u32,
+    // Last leaf accessed
+    leaf: VdbLeaf,
+    // intersection point
+    p: vec3<f32>,
+    // Direction of last step
+    mask: vec3<bool>,
+    // Iteration of return
+    i: u32,
+}
+
+fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    let hit: HDDAout = hdda_ray(src, dir);
+    let step: vec3<f32> = sign11(dir);
+
+    if hit.state == 0u {
+        var grid = vec3<f32>(0.0);
+        if s.show_345[2] == 1u && any(floor(hit.p) % 4096. == 0.) {
+            grid = vec3<f32>(-0.3, -0.3, 1.0);
+        }
+        else if s.show_345[1] == 1u && any(floor(hit.p) % 128. == 0.) {
+            grid = vec3<f32>(-0.1, 0.0, 0.8);
+        }
+        else if s.show_345[0] == 1u && any(floor(hit.p) % 8. == 0.) {
+            grid = vec3<f32>(-0.1, 0.5, 0.3);
+        }
+
+        switch s.render_mode {
+        case 0u: { // Default
+            return grid + dot(vec3<f32>(hit.mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
+        }
+        case 1u: { // Rgb
+            return grid + vec3(0.1) + vec3<f32>(hit.mask) * vec3(0.1, 0.2, 0.3);
+        }
+        case 2u: { // Ray length
+            let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
+            let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
+            let t = f32(hit.i) / f32(500u);
+
+            return grid + mix(color1, color2, t);
+        }
+        case 3u {
+            // We are in ray trace mode => check clear path to sun
+
+            let hit2: HDDAout = hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir);
+            let I = s.sun_color.a * k_d * dot(s.sun_dir, normalize(step * vec3<f32>(hit.mask)));
+
+            if hit2.state == 0u {
+                return vec3(0.1) + I * s.sun_color.xyz * 0.01;
+            }
+
+            return vec3(0.1) + I * s.sun_color.xyz;
+        }
+        default: {
+            return grid + dot(vec3<f32>(hit.mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
+        }
+        }
+    }
+
+    if hit.state == 1u {
+        switch s.render_mode {
+        case 0u: {
+            return vec3(0.0) + dot(vec3<f32>(hit.mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
+        }
+        case 1u: {
+            return vec3(0.0) + dot(vec3<f32>(hit.mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
+        }
+        case 2u: {
+            let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
+            let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
+            let t = f32(hit.i) / f32(500u);
+
+            return mix(color1, color2, t) + dot(vec3<f32>(hit.mask) * vec3(0.04, 0.08, 0.12), vec3(1.0));
+        }
+        default: {
+            return vec3(0.0) + dot(vec3<f32>(hit.mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
+        }
+        }
     }
 
     return vec3<f32>(dir);
