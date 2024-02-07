@@ -51,7 +51,7 @@ impl EguiDev {
             platform,
             selected_model: 0,
             models: get_available_vdbs(),
-            render_mode: RenderMode::Gray,
+            render_mode: RenderMode::Diffuse,
             show_grid: [false; 3],
             sun_settings: SunSettings::default(),
             last_fps_update: Instant::now(),
@@ -190,30 +190,34 @@ impl EguiDev {
                     );
                 });
 
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Show grid: ").font(FontId::proportional(15.0)));
+                if self.render_mode != RenderMode::Diffuse {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Show grid: ").font(FontId::proportional(15.0)));
 
-                    ui.toggle_value(
-                        &mut self.show_grid[0],
-                        RichText::new("Node 3").font(FontId::proportional(15.0)),
-                    );
+                        ui.toggle_value(
+                            &mut self.show_grid[0],
+                            RichText::new("Node 3").font(FontId::proportional(15.0)),
+                        );
 
-                    ui.toggle_value(
-                        &mut self.show_grid[1],
-                        RichText::new("Node 4").font(FontId::proportional(15.0)),
-                    );
+                        ui.toggle_value(
+                            &mut self.show_grid[1],
+                            RichText::new("Node 4").font(FontId::proportional(15.0)),
+                        );
 
-                    ui.toggle_value(
-                        &mut self.show_grid[2],
-                        RichText::new("Node 5").font(FontId::proportional(15.0)),
-                    );
-                });
+                        ui.toggle_value(
+                            &mut self.show_grid[2],
+                            RichText::new("Node 5").font(FontId::proportional(15.0)),
+                        );
+                    });
+                }
 
                 reload_shaders = ui
                     .button(RichText::new("Reload shaders").font(FontId::proportional(15.0)))
                     .clicked();
 
-                self.sun_settings.get_frame(ui);
+                if self.render_mode == RenderMode::Diffuse {
+                    self.sun_settings.get_frame(ui);
+                }
             });
 
         let full_output = self.platform.end_frame(Some(&window));
@@ -321,7 +325,7 @@ impl Default for SunSettings {
                 z: 0.5,
             }
             .normalize(),
-            color: [0.5, 0.6, 0.2],
+            color: [255. / 255., 210. / 255., 160. / 255.],
             intensity: 1.0,
         }
     }
