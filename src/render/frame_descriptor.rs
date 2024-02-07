@@ -50,6 +50,9 @@ impl FrameDescriptor {
             size.width as f32,
             egui_dev.render_mode,
             egui_dev.show_grid,
+            egui_dev.sun_settings.dir3.to_array(),
+            egui_dev.sun_settings.color,
+            egui_dev.sun_settings.intensity,
         )
         .bind(device)
     }

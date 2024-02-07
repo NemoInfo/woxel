@@ -15,6 +15,8 @@ struct State {
     ray: Ray,
     render_mode: u32,
     show_345: vec3<u32>,
+    sun_dir: vec3<f32>,
+    sun_color: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -77,6 +79,9 @@ fn modulo_vec3f(x: vec3<f32>, y:f32) -> vec3<f32> {
     return x - y * floor(x / y); 
 }
 
+// MATERIAL CONSTANTS
+const k_d: f32 = 0.7;
+
 const HDDA_MAX_RAY_STEPS: u32 = 1000u;
 const scale = array<f32, 4>(1., 8., 128., 4096.);
 fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
@@ -116,6 +121,10 @@ fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
                 let t = f32(i) / f32(500u);
 
                 return grid + mix(color1, color2, t);
+            }
+            case 3u {
+                let I = s.sun_color.a * k_d * dot(s.sun_dir, normalize(step * vec3<f32>(mask)));
+                return vec3(0.1) + I * s.sun_color.xyz;
             }
             default: {
                 return grid + dot(vec3<f32>(mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));

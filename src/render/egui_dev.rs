@@ -2,7 +2,7 @@ use std::{fs, time::Instant};
 
 use crate::scene::Scene;
 use cgmath::Point3;
-use egui::{ClippedPrimitive, Color32, ComboBox, FontId, RichText, TexturesDelta};
+use egui::{ClippedPrimitive, Color32, ComboBox, FontId, RichText, Slider, TexturesDelta, Vec2};
 use egui_plot::{Bar, BarChart, Plot};
 use egui_wgpu_backend::ScreenDescriptor;
 use instant::Duration;
@@ -13,6 +13,7 @@ pub enum RenderMode {
     Gray,
     Rgb,
     Ray,
+    Diffuse,
 }
 
 impl RenderMode {
@@ -21,6 +22,7 @@ impl RenderMode {
             Self::Gray => "Gray",
             Self::Rgb => "Rgb",
             Self::Ray => "Ray",
+            Self::Diffuse => "Diffuse",
         })
     }
 
@@ -36,6 +38,7 @@ pub struct EguiDev {
     pub render_mode: RenderMode,
     pub show_grid: [bool; 3],
     pub models: Vec<VdbFile>,
+    pub sun_settings: SunSettings,
     last_fps_update: Instant,
     time_last_frame: Instant,
     past_fps: Vec<f32>,
@@ -50,6 +53,7 @@ impl EguiDev {
             models: get_available_vdbs(),
             render_mode: RenderMode::Gray,
             show_grid: [false; 3],
+            sun_settings: SunSettings::default(),
             last_fps_update: Instant::now(),
             time_last_frame: Instant::now(),
             current_fps: 0.,
@@ -168,36 +172,38 @@ impl EguiDev {
                         &mut self.render_mode,
                         RenderMode::Gray,
                         RenderMode::Gray.rich_text(),
-                    )
-                    .clicked();
+                    );
                     ui.selectable_value(
                         &mut self.render_mode,
                         RenderMode::Rgb,
                         RenderMode::Rgb.rich_text(),
-                    )
-                    .clicked();
+                    );
                     ui.selectable_value(
                         &mut self.render_mode,
                         RenderMode::Ray,
                         RenderMode::Ray.rich_text(),
-                    )
-                    .clicked();
+                    );
+                    ui.selectable_value(
+                        &mut self.render_mode,
+                        RenderMode::Diffuse,
+                        RenderMode::Diffuse.rich_text(),
+                    );
                 });
 
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("Show grid: ").font(FontId::proportional(15.0)));
 
-                    ui.checkbox(
+                    ui.toggle_value(
                         &mut self.show_grid[0],
                         RichText::new("Node 3").font(FontId::proportional(15.0)),
                     );
 
-                    ui.checkbox(
+                    ui.toggle_value(
                         &mut self.show_grid[1],
                         RichText::new("Node 4").font(FontId::proportional(15.0)),
                     );
 
-                    ui.checkbox(
+                    ui.toggle_value(
                         &mut self.show_grid[2],
                         RichText::new("Node 5").font(FontId::proportional(15.0)),
                     );
@@ -206,6 +212,8 @@ impl EguiDev {
                 reload_shaders = ui
                     .button(RichText::new("Reload shaders").font(FontId::proportional(15.0)))
                     .clicked();
+
+                self.sun_settings.get_frame(ui);
             });
 
         let full_output = self.platform.end_frame(Some(&window));
@@ -295,4 +303,146 @@ fn get_available_vdbs() -> Vec<VdbFile> {
     files.sort_by(|x, y| x.name.cmp(&y.grid));
 
     files
+}
+
+#[derive(Debug)]
+pub struct SunSettings {
+    pub dir3: glam::Vec3,
+    pub color: [f32; 3],
+    pub intensity: f32,
+}
+
+impl Default for SunSettings {
+    fn default() -> Self {
+        Self {
+            dir3: glam::Vec3 {
+                x: 1.0,
+                y: -1.0,
+                z: 0.5,
+            }
+            .normalize(),
+            color: [0.5, 0.6, 0.2],
+            intensity: 1.0,
+        }
+    }
+}
+
+impl SunSettings {
+    fn get_frame(&mut self, ui: &mut egui::Ui) {
+        ui.collapsing(
+            RichText::new("Sunlight settings").font(FontId::proportional(15.0)),
+            |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(format!("X: {:.2}", self.dir3.x))
+                            .font(FontId::proportional(15.0))
+                            .color(Color32::RED),
+                    );
+                    ui.label(
+                        RichText::new(format!("Y: {:.2}", self.dir3.y))
+                            .font(FontId::proportional(15.0))
+                            .color(Color32::from_rgb(0, 136, 255)),
+                    );
+                    ui.label(
+                        RichText::new(format!("Z: {:.2}", self.dir3.z))
+                            .font(FontId::proportional(15.0))
+                            .color(Color32::GREEN),
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.set_max_width(150.);
+                        ui.set_min_height(150.);
+                        ui.centered_and_justified(|ui| {
+                            self.get_circle(ui);
+                        });
+                    });
+                    ui.vertical_centered_justified(|ui| {
+                        let prev_fg_color = ui.style().visuals.widgets.inactive.fg_stroke.color;
+                        let prev_ac_color = ui.style().visuals.widgets.active.fg_stroke.color;
+                        let prev_hv_color = ui.style().visuals.widgets.hovered.fg_stroke.color;
+
+                        ui.style_mut().visuals.widgets.inactive.fg_stroke.color =
+                            Color32::from_rgb(0, 136, 255);
+                        ui.style_mut().visuals.widgets.active.fg_stroke.color =
+                            Color32::from_rgb(20, 160, 255);
+                        ui.style_mut().visuals.widgets.hovered.fg_stroke.color =
+                            Color32::from_rgb(20, 160, 255);
+                        let mut slider_val = -self.dir3.y;
+                        ui.add_space(25.);
+                        ui.add(
+                            Slider::new(&mut slider_val, -1.0..=1.0)
+                                .vertical()
+                                .show_value(false),
+                        )
+                        .rect;
+                        ui.style_mut().visuals.widgets.inactive.fg_stroke.color = prev_fg_color;
+                        ui.style_mut().visuals.widgets.active.fg_stroke.color = prev_ac_color;
+                        ui.style_mut().visuals.widgets.hovered.fg_stroke.color = prev_hv_color;
+                        self.dir3.y = -slider_val;
+                        self.dir3 = self.dir3.normalize()
+                    });
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Intensity").font(FontId::proportional(15.0)));
+                    ui.add(Slider::new(&mut self.intensity, 0.0..=50.0));
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Light color").font(FontId::proportional(15.0)));
+                    ui.color_edit_button_rgb(&mut self.color);
+                });
+            },
+        );
+    }
+
+    fn get_circle(&mut self, ui: &mut egui::Ui) {
+        let size = 100.;
+        let (response, painter) =
+            ui.allocate_painter(Vec2::new(size, size), egui::Sense::click_and_drag());
+        let rect = response.rect;
+        let center = rect.center();
+        let radius = rect.width().min(rect.height()) * 0.4;
+
+        // Draw the sphere representation
+        painter.circle(center, radius, egui::Color32::GRAY, egui::Stroke::NONE);
+
+        if let Some(pointer_pos) = response.interact_pointer_pos() {
+            let direction = pointer_pos - center;
+            // Calculate the direction vector, but restrict it to the sphere's surface
+            let dir2 = if direction.length() > radius {
+                direction.normalized()
+            } else {
+                direction / radius
+            };
+
+            self.dir3.z = dir2.x;
+            self.dir3.x = -dir2.y;
+            self.dir3.y = self.dir3.y.signum()
+                * (1.0 - self.dir3.x * self.dir3.x - self.dir3.z * self.dir3.z)
+                    .abs()
+                    .sqrt();
+
+            assert!(self.dir3.is_normalized());
+        }
+
+        let dir2 = Vec2 {
+            x: self.dir3.z * radius,
+            y: -self.dir3.x * radius,
+        };
+
+        painter.arrow(
+            center,
+            dir2,
+            egui::Stroke::new(2.0, egui::Color32::from_rgb(255, 200, 0)),
+        );
+
+        painter.arrow(center, Vec2::UP * 60., egui::Stroke::new(1.0, Color32::RED));
+        painter.arrow(
+            center,
+            Vec2::RIGHT * 60.,
+            egui::Stroke::new(1.0, Color32::GREEN),
+        );
+    }
 }

@@ -18,8 +18,14 @@ pub struct ComputeState {
     mv: [f32; 4],
     // w' = (-width / 2) u + (height / 2) v - ((height / 2) / tan(fov * 0.5)) w
     wp: [f32; 4],
+    // Type of rendering we are doing
     render_mode: [u32; 4],
+    // Flags that enable/disable highlighting boundry voxels
     show_345: [u32; 4],
+    // Direction of sun vector
+    sun_dir: [f32; 4],
+    // Color of sun vector, alpha channel is for intenisty
+    sun_color: [f32; 4],
 }
 
 impl GpuUniform for ComputeState {
@@ -83,6 +89,9 @@ impl ComputeState {
         resolution_width: f32,
         render_mode: RenderMode,
         show_grid: [bool; 3],
+        sun_dir3: [f32; 3],
+        sun_color3: [f32; 3],
+        sun_intensity: f32,
     ) -> Self {
         let view_proj = c.build_view_projection_matrix();
         let camera_to_world = match view_proj.invert() {
@@ -101,6 +110,12 @@ impl ComputeState {
         let show_grid = show_grid.map(|x| x as u32);
         let show_345 = [show_grid[0], show_grid[1], show_grid[2], 0];
 
+        let mut sun_dir = [0.0; 4];
+        sun_dir[..3].copy_from_slice(&sun_dir3);
+
+        let mut sun_color = [sun_intensity; 4];
+        sun_color[..3].copy_from_slice(&sun_color3);
+
         Self {
             view_projection: view_proj.into(),
             camera_to_world: camera_to_world.into(),
@@ -110,6 +125,8 @@ impl ComputeState {
             wp: wp.into(),
             render_mode,
             show_345,
+            sun_dir,
+            sun_color,
         }
     }
 }
