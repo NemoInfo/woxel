@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use itertools::Itertools;
 
-use crate::vdb::data_structure::*;
+use crate::vdb::{data_structure::*, From4LeBytes};
 
 use super::VdbValueType;
 
@@ -101,7 +101,7 @@ where
         let bit_index_0 = <N3<ValueType>>::global_to_offset(p);
         let node3_data = &node3.data[bit_index_0];
         match node3_data {
-            LeafData::Offset(offset) => VdbEndpoint::Offs(*offset),
+            LeafData::Tile(offset) => VdbEndpoint::Offs(*offset),
             LeafData::Value(value) => VdbEndpoint::Leaf(value),
         }
     }
@@ -243,7 +243,7 @@ where
                         n3_atlas[n3_atlas_data_pos.x][n3_atlas_data_pos.y][n3_atlas_data_pos.z] =
                             match node3_data {
                                 &LeafData::Value(value) => value,
-                                &LeafData::Offset(offset) => {
+                                &LeafData::Tile(offset) => {
                                     ValueType::from_4_le_bytes((offset as u32).to_le_bytes())
                                 }
                             };
@@ -286,6 +286,64 @@ where
             }
         }
         count
+    }
+
+    /// Store signed distance field information in empty voxels
+    pub fn compute_sdf(&mut self) {
+        // Intialize with infinite distance
+        for (_, root_data) in self.root.map.iter_mut() {
+            let RootData::Node(node5) = root_data else {
+                // TODO: handle node5 tiles (if we actually need to?)
+                continue;
+            };
+
+            for node5_data in node5.data.iter_mut() {
+                if let InternalData::Tile(tile_value) = node5_data {
+                    // Set tile value to max
+                    *tile_value = <ValueType as From4LeBytes>::from_4_le_bytes([1; 4]);
+                }
+                let InternalData::Node(node4) = node5_data else {
+                    continue;
+                };
+
+                for node4_data in node4.data.iter_mut() {
+                    if let InternalData::Tile(tile_value) = node4_data {
+                        // Set tile value to max
+                        *tile_value = <ValueType as From4LeBytes>::from_4_le_bytes([1; 4]);
+                    }
+                    let InternalData::Node(node3) = node4_data else {
+                        continue;
+                    };
+
+                    for node3_data in node3.data.iter_mut() {
+                        if let LeafData::Tile(tile_value) = node3_data {
+                            *tile_value = usize::MAX;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Node4 tiles first pass
+        for (_, root_data) in self.root.map.iter_mut() {
+            let RootData::Node(node5) = root_data else {
+                // TODO: handle node5 tiles (if we actually need to?)
+                continue;
+            };
+
+            for (n4i, node5_data) in node5.data.iter_mut().enumerate() {
+                if let InternalData::Tile(tile_value) = node5_data {
+                    // Check all already processed neighboours.
+                    // (*, *, z-1), (*, y-1, z), (x-1, y, z)
+                    let pos = <N5<ValueType> as Node>::offset_to_relative(n4i);
+                    // Here I need to convert this local relative local position to a global one in order to check the
+                    // neighbours regardless of wether they belong to the same node or not
+                    todo!();
+                }
+            }
+        }
+        todo!()
     }
 }
 

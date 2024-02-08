@@ -192,7 +192,7 @@ fn write_node3_data<T: VdbValueType>(b: &mut BytesMut, node3: &Box<N3<T>>) {
     for data in &node3.data {
         match data {
             // @HACK: figure out the offsets size and shape and purpose =)))
-            LeafData::Offset(_) => b.put_u32_le(0),
+            LeafData::Tile(_) => b.put_u32_le(0),
             LeafData::Value(val) => b.put_u32_le(val.copy_bytes_to_u32()),
         }
     }

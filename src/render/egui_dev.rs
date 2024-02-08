@@ -410,7 +410,7 @@ impl SunSettings {
         let radius = rect.width().min(rect.height()) * 0.4;
 
         // Draw the sphere representation
-        painter.circle(center, radius, egui::Color32::GRAY, egui::Stroke::NONE);
+        painter.circle(center, radius, egui::Color32::DARK_GRAY, egui::Stroke::NONE);
 
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let direction = pointer_pos - center;

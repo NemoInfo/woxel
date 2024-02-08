@@ -1,3 +1,5 @@
+/// The VDB data structure was originally proposed by Ken Museth in his 2013 paper entitled [VDB: High-Resolution Sparse Volumes with Dynamic Topology](https://www.museth.org/Ken/Publications_files/Museth_TOG13.pdf)
+///
 use bitflags::bitflags;
 use bitvec::vec::BitVec;
 use cgmath::Vector3;
@@ -45,10 +47,12 @@ pub trait Node {
     /// Give the index for the child node that contains the `global` position ``
     ///
     /// This is conceptually equivalent to calling global_to_relative > relative_to_child > child_to_offset
+    /// It is a Rust adaptation of the [original paper](https://www.museth.org/Ken/Publications_files/Museth_TOG13.pdf) (line 46-49)
     fn global_to_offset(global: GlobalCoordinates) -> Offset {
-        // ((( x &(1 < < sLog2X ) -1) > > Child :: sLog2X ) < < Log2YZ ) +
-        // ((( y &(1 < < sLog2Y ) -1) > > Child :: sLog2Y ) < < Log2Z ) +
-        // (( z &(1 < < sLog2Z ) -1) > > Child :: sLog2Z );
+        // Translated from
+        // ((( x &(1 << sLog2X ) -1) >> Child :: sLog2X ) << Log2YZ ) +
+        // ((( y &(1 << sLog2Y ) -1) >> Child :: sLog2Y ) << Log2Z ) +
+        //  (( z &(1 << sLog2Z ) -1) >> Child :: sLog2Z );
 
         ((((global.x & (1 << Self::TOTAL_LOG2_D) - 1) >> Self::CHILD_TOTAL_LOG2_D)
             << Self::LOG2_DD)
@@ -63,6 +67,7 @@ pub trait Node {
         global.map(|c| (c >> Self::TOTAL_LOG2_D) << Self::TOTAL_LOG2_D)
     }
 
+    /// Give relative coordinate from offset
     fn offset_to_relative(offset: Offset) -> LocalCoordinates {
         (
             offset as u32 >> Self::LOG2_DD,
@@ -109,7 +114,7 @@ where
 {
     pub fn new() -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
-            std::array::from_fn(|_| LeafData::Offset(0));
+            std::array::from_fn(|_| LeafData::Tile(0));
         let value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
             [0; ((1 << (LOG2_D * 3)) / 64) as usize];
         let flags = 0;
@@ -123,7 +128,7 @@ where
 
     pub fn new_from_header(value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize]) -> Self {
         let data: [LeafData<ValueType>; (1 << (LOG2_D * 3)) as usize] =
-            std::array::from_fn(|_| LeafData::Offset(0));
+            std::array::from_fn(|_| LeafData::Tile(0));
         [0; ((1 << (LOG2_D * 3)) / 64) as usize];
         let flags = 0;
 
@@ -137,7 +142,7 @@ where
 
 #[derive(Debug)]
 pub enum LeafData<ValueType> {
-    Offset(usize),
+    Tile(usize),
     Value(ValueType),
 }
 

@@ -24,8 +24,7 @@ You can load any `.vdb` model into the engine by adding it to the `assets/` fold
 Then, on the dev pannel just select it from the dropdown menu. 
 
 ## Screenshots
-![](photos/woxel_space_ray.png) 
-![](photos/woxel_teapot.png) 
+![](photos/woxel_space_ray.png)
 ![](photos/woxel_space.png)
 
 

@@ -138,7 +138,7 @@ struct HDDAout {
     state: u32,
     // Last leaf accessed
     leaf: VdbLeaf,
-    // intersection point
+    // Intersection point
     p: vec3<f32>,
     // Direction of last step
     mask: vec3<bool>,
@@ -183,7 +183,7 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             let I = s.sun_color.a * k_d * dot(s.sun_dir, normalize(step * vec3<f32>(hit.mask)));
 
             if hit2.state == 0u {
-                return vec3(0.1) + I * s.sun_color.xyz * 0.01;
+                return vec3(0.1) + I * s.sun_color.xyz * 0.05;
             }
 
             return vec3(0.1) + I * s.sun_color.xyz;
