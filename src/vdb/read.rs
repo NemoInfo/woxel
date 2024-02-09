@@ -291,10 +291,10 @@ impl<R: Read + Seek> VdbReader<R> {
             let root_key = <Root345<T>>::root_key_from_coords(origin);
 
             let value_bytes = self.reader.read_u32::<LittleEndian>()?;
-            let value = T::from_4_le_bytes(value_bytes.to_le_bytes());
+            let value = u32::from_4_le_bytes(value_bytes.to_le_bytes());
             let active = self.reader.read_u8()? == 1;
 
-            let node5_tile = RootData::Tile::<T, N5<T>>(value, active);
+            let node5_tile = RootData::Tile::<N5<T>>(value, active);
             node5_entries.push((root_key, node5_tile));
         }
 

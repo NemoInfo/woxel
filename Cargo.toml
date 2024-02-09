@@ -22,7 +22,7 @@ egui_winit_platform = "0.20.0"
 env_logger = "0.10.0"
 flate2 = "1.0.27"
 glam = "0.24.1"
-half = { version = "2.3.1", features = ["bytemuck"] }
+half = { version = "2.3.1", features = ["bytemuck", "num-traits"] }
 instant = "0.1.12"
 itertools = "0.11.0"
 log = "0.4.20"

@@ -32,6 +32,11 @@ pub trait Node {
     /// Total conceptual size of node, including child size
     const TOTAL_SIZE: u64 = 1 << (Self::TOTAL_LOG2_D * 3);
 
+    // TODO: Explain naming convention better
+    // global -> global coordinates of a node
+    // relative -> global coordinates minus node origin
+    // child -> local coordinates in the grid of the node (scaling down depending on child size)
+    // offset -> index of child in parent data array
     /// Give local coordinates relative to the Node containing `global` position
     fn global_to_relative(global: GlobalCoordinates) -> LocalCoordinates {
         global
@@ -68,7 +73,9 @@ pub trait Node {
     }
 
     /// Give relative coordinate from offset
-    fn offset_to_relative(offset: Offset) -> LocalCoordinates {
+    ///
+    /// index in the data field of the node -> relative x, y, z of child inside
+    fn offset_to_child(offset: Offset) -> LocalCoordinates {
         (
             offset as u32 >> Self::LOG2_DD,
             (offset as u32 >> Self::LOG2_D) & (Self::DIM as u32 - 1),
@@ -76,9 +83,13 @@ pub trait Node {
         )
             .into()
     }
+
+    fn child_to_offset(local: LocalCoordinates) -> Offset {
+        (local.x << Self::LOG2_DD | local.y << Self::LOG2_D | local.z) as usize
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LeafNode<ValueType, const LOG2_D: u64>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
@@ -140,20 +151,20 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LeafData<ValueType> {
     Tile(usize),
     Value(ValueType),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InternalNode<ValueType, ChildType, const LOG2_D: u64>
 where
     [(); (1 << (LOG2_D * 3)) as usize]:,
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
     ChildType: Node,
 {
-    pub data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize],
+    pub data: [InternalData<ChildType>; (1 << (LOG2_D * 3)) as usize],
     pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
     pub child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
     pub origin: [i32; 3],
@@ -167,8 +178,8 @@ where
     ChildType: Node,
 {
     pub fn new(origin: GlobalCoordinates) -> Self {
-        let data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize] =
-            std::array::from_fn(|_| InternalData::Tile(ValueType::zeroed()));
+        let data: [InternalData<ChildType>; (1 << (LOG2_D * 3)) as usize] =
+            std::array::from_fn(|_| InternalData::Tile(0));
         let value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
             [0; ((1 << (LOG2_D * 3)) / 64) as usize];
         let child_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize] =
@@ -188,8 +199,8 @@ where
         value_mask: [u64; ((1 << (LOG2_D * 3)) / 64) as usize],
         origin: [i32; 3],
     ) -> Self {
-        let data: [InternalData<ValueType, ChildType>; (1 << (LOG2_D * 3)) as usize] =
-            std::array::from_fn(|_| InternalData::Tile(ValueType::zeroed()));
+        let data: [InternalData<ChildType>; (1 << (LOG2_D * 3)) as usize] =
+            std::array::from_fn(|_| InternalData::Tile(0));
 
         Self {
             data,
@@ -211,26 +222,26 @@ where
     const TOTAL_LOG2_D: u64 = LOG2_D + ChildType::TOTAL_LOG2_D;
 }
 
-#[derive(Debug)]
-pub enum InternalData<ValueType, ChildType> {
+#[derive(Debug, Clone)]
+pub enum InternalData<ChildType> {
     Node(Box<ChildType>),
-    Tile(ValueType),
+    Tile(u32),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RootNode<ValueType, ChildType: Node>
 where
     ValueType: VdbValueType,
 {
     // @SPEED: Use a custom hash function
-    pub map: HashMap<[i32; 3], RootData<ValueType, ChildType>>,
+    pub map: HashMap<[i32; 3], RootData<ChildType>>,
     pub background: ValueType,
 }
 
-#[derive(Debug)]
-pub enum RootData<ValueType, ChildType> {
+#[derive(Debug, Clone)]
+pub enum RootData<ChildType> {
     Node(Box<ChildType>),
-    Tile(ValueType, bool),
+    Tile(u32, bool),
 }
 
 impl<ValueType, ChildType: Node> RootNode<ValueType, ChildType>
@@ -255,7 +266,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VDB<ValueType, ChildType: Node>
 where
     ValueType: VdbValueType,
@@ -317,12 +328,16 @@ where
     }
 }
 
-#[derive(Debug)]
+// HACK:
+// This is a bit akward Root is actually just a Node5 tile
+// Inner(v, 5) is a Node4 tile
+// Inner(v, 4) is a Node3 tile
+#[derive(Debug, Clone)]
 pub enum VdbEndpoint<ValueType> {
     Offs(usize),
     Leaf(ValueType),
-    Innr(ValueType, u8),
-    Root(ValueType),
+    Innr(u32, u8),
+    Root(u32),
     Bkgr(ValueType),
 }
 
@@ -454,5 +469,16 @@ mod tests {
         assert_eq!(83, N3::global_to_offset([1, 2, 3].into()));
         assert_eq!(3382, N4::global_to_offset([121321, 212123, 3121].into()));
         assert_eq!(0, N5::global_to_offset([1, 2, 3].into()));
+    }
+
+    #[test]
+    fn local_to_offset_test() {
+        let tests = vec![[1, 2, 3], [15, 15, 0], [8, 9, 10]];
+
+        for coord in tests {
+            let offset = N4::child_to_offset(coord.into());
+            let res: [u32; 3] = N4::offset_to_child(offset).into();
+            assert_eq!(coord, res);
+        }
     }
 }

@@ -18,7 +18,6 @@ pub type N5Cube<ValueType> = [[[ValueType; 1 << 5]; 1 << 5]; 1 << 5];
 const N5DIM: usize = <N5<u32>>::DIM as usize;
 const N4DIM: usize = <N4<u32>>::DIM as usize;
 const N3DIM: usize = <N3<u32>>::DIM as usize;
-
 impl<'a, ValueType> VDB345<ValueType>
 where
     ValueType: VdbValueType,
@@ -34,7 +33,7 @@ where
             .root
             .map
             .entry(root_key)
-            .or_insert_with(|| RootData::Node(Box::new(<N5<ValueType>>::new(p))));
+            .or_insert(RootData::Node(Box::new(<N5<ValueType>>::new(p))));
 
         if let RootData::Tile(..) = root_entry {
             *root_entry = RootData::Node(Box::new(<N5<ValueType>>::new(p)));
@@ -77,7 +76,7 @@ where
             let RootData::Tile(value, _) = root_data else {
                 unreachable!()
             };
-            return VdbEndpoint::Root(value);
+            return VdbEndpoint::Root(*value);
         };
 
         let bit_index_4 = <N5<ValueType>>::global_to_offset(p);
@@ -86,7 +85,7 @@ where
             let InternalData::Tile(value) = node5_data else {
                 unreachable!()
             };
-            return VdbEndpoint::Innr(value, 5);
+            return VdbEndpoint::Innr(*value, 5);
         };
 
         let bit_index_3 = <N4<ValueType>>::global_to_offset(p);
@@ -95,7 +94,7 @@ where
             let InternalData::Tile(value) = node4_data else {
                 unreachable!()
             };
-            return VdbEndpoint::Innr(value, 4);
+            return VdbEndpoint::Innr(*value, 4);
         };
 
         let bit_index_0 = <N3<ValueType>>::global_to_offset(p);
@@ -197,7 +196,7 @@ where
                 origin_from_idx(n5_idx, n5_atlas_dim) * <N5<ValueType>>::DIM as usize;
 
             for (offset, node5_data) in node5.data.iter().enumerate() {
-                let n5_data_rel: Vector3<usize> = <N5<ValueType>>::offset_to_relative(offset)
+                let n5_data_rel: Vector3<usize> = <N5<ValueType>>::offset_to_child(offset)
                     .map(|c| c as usize)
                     .into();
 
@@ -208,14 +207,14 @@ where
                         unreachable!();
                     };
                     n5_atlas[n5_atlas_data_pos.x][n5_atlas_data_pos.y][n5_atlas_data_pos.z] =
-                        node4_tile;
+                        <ValueType as From4LeBytes>::from_4_le_bytes(node4_tile.to_le_bytes());
                     continue;
                 };
                 let n4_atlas_origin: Vector3<usize> =
                     origin_from_idx(n4_idx, n4_atlas_dim) * <N4<ValueType>>::DIM as usize;
 
                 for (offset, node4_data) in node4.data.iter().enumerate() {
-                    let n4_data_rel: Vector3<usize> = <N4<ValueType>>::offset_to_relative(offset)
+                    let n4_data_rel: Vector3<usize> = <N4<ValueType>>::offset_to_child(offset)
                         .map(|c| c as usize)
                         .into();
 
@@ -226,17 +225,16 @@ where
                             unreachable!();
                         };
                         n4_atlas[n4_atlas_data_pos.x][n4_atlas_data_pos.y][n4_atlas_data_pos.z] =
-                            node3_tile;
+                            <ValueType as From4LeBytes>::from_4_le_bytes(node3_tile.to_le_bytes());
                         continue;
                     };
                     let n3_atlas_origin: Vector3<usize> =
                         origin_from_idx(n3_idx, n3_atlas_dim) * <N3<ValueType>>::DIM as usize;
 
                     for (offset, node3_data) in node3.data.iter().enumerate() {
-                        let n3_data_rel: Vector3<usize> =
-                            <N3<ValueType>>::offset_to_relative(offset)
-                                .map(|c| c as usize)
-                                .into();
+                        let n3_data_rel: Vector3<usize> = <N3<ValueType>>::offset_to_child(offset)
+                            .map(|c| c as usize)
+                            .into();
 
                         let n3_atlas_data_pos = n3_atlas_origin + n3_data_rel;
 
@@ -300,7 +298,7 @@ where
             for node5_data in node5.data.iter_mut() {
                 if let InternalData::Tile(tile_value) = node5_data {
                     // Set tile value to max
-                    *tile_value = <ValueType as From4LeBytes>::from_4_le_bytes([1; 4]);
+                    *tile_value = u32::MAX;
                 }
                 let InternalData::Node(node4) = node5_data else {
                     continue;
@@ -309,7 +307,7 @@ where
                 for node4_data in node4.data.iter_mut() {
                     if let InternalData::Tile(tile_value) = node4_data {
                         // Set tile value to max
-                        *tile_value = <ValueType as From4LeBytes>::from_4_le_bytes([1; 4]);
+                        *tile_value = u32::MAX;
                     }
                     let InternalData::Node(node3) = node4_data else {
                         continue;
@@ -325,21 +323,76 @@ where
             }
         }
 
-        // Node4 tiles first pass
-        for (_, root_data) in self.root.map.iter_mut() {
-            let RootData::Node(node5) = root_data else {
-                // TODO: handle node5 tiles (if we actually need to?)
-                continue;
-            };
+        let mut f_neighbours: Vec<Vector3<i32>> = vec![];
 
-            for (n4i, node5_data) in node5.data.iter_mut().enumerate() {
-                if let InternalData::Tile(tile_value) = node5_data {
-                    // Check all already processed neighboours.
-                    // (*, *, z-1), (*, y-1, z), (x-1, y, z)
-                    let pos = <N5<ValueType> as Node>::offset_to_relative(n4i);
-                    // Here I need to convert this local relative local position to a global one in order to check the
-                    // neighbours regardless of wether they belong to the same node or not
-                    todo!();
+        for dy in [-1, 0, 1] {
+            for dz in [-1, 0, 1] {
+                f_neighbours.push([-1, dy, dz].into());
+            }
+        }
+
+        for dz in [-1, 0, 1] {
+            f_neighbours.push([0, -1, dz].into());
+        }
+
+        f_neighbours.push([0, 0, -1].into());
+
+        // Node4 tiles first pass
+        unsafe {
+            // borrow checker go brr
+            let root_ptr = &mut self.root as *mut Root345<ValueType>;
+
+            for (&origin5, root_data) in (*root_ptr).map.iter_mut().sorted_by_key(|(key, _)| *key) {
+                let RootData::Node(node5) = root_data else {
+                    // TODO: handle node5 tiles (if we actually need to?)
+                    continue;
+                };
+
+                let origin5: Vector3<i32> = origin5.into();
+                // borrow checker go brr
+
+                let node5_ptr = &mut *node5 as *mut Box<N5<ValueType>>;
+                for (n4i, node5_data) in node5.data.iter_mut().enumerate() {
+                    match node5_data {
+                        InternalData::Tile(tile_value) => {
+                            let child5 = <N5<ValueType>>::offset_to_child(n4i);
+                            let global: Vector3<i32> = origin5 + child5.map(|x| x as i32);
+
+                            for dn in &f_neighbours {
+                                let nchild5 = child5.map(|x| x as i32) + dn;
+                                let nglobal = origin5 + nchild5;
+                                if <N5<ValueType>>::global_to_node(nglobal) == global {
+                                    let nid =
+                                        <N5<ValueType>>::child_to_offset(nchild5.map(|x| x as u32));
+                                    match (*node5_ptr).data[nid] {
+                                        InternalData::Node(_) => {
+                                            *tile_value = 1;
+                                            break;
+                                        }
+                                        InternalData::Tile(v) => {
+                                            *tile_value = (*tile_value).min(v + 1);
+                                            continue;
+                                        }
+                                    }
+                                }
+
+                                let endpoint = self.get_voxel(nglobal);
+                                match endpoint {
+                                    VdbEndpoint::Innr(v, 5) => {
+                                        *tile_value = (*tile_value).min(v + 1);
+                                    }
+                                    _ => {
+                                        *tile_value = 1;
+                                    }
+                                }
+                            }
+                        }
+                        InternalData::Node(node4) => {
+                            for (n3i, node4_data) in node4.data.iter_mut().enumerate() {
+                                let child4 = <N4<ValueType>>::offset_to_child(n3i);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -394,6 +447,24 @@ mod tests {
                     };
                     assert_eq!(i as u8, res);
                 }
+            })
+            .unwrap();
+        handler.join().unwrap_or_else(|_| panic!("Test Failed"));
+    }
+
+    #[test]
+    fn compute_sdf_test() {
+        let builder = thread::Builder::new()
+            .name("set_voxel_test".into())
+            .stack_size(80 * 1024 * 1024); // @HACK to increase stack size of this test
+        let handler = builder
+            .spawn(|| {
+                let mut vdb = <VDB345<u8>>::new();
+                let points = [[0, 0, 0], [-1, -1, 0]];
+                for (i, &point) in points.iter().enumerate() {
+                    vdb.set_voxel(point.into(), i as u8 + 1);
+                }
+                vdb.compute_sdf();
             })
             .unwrap();
         handler.join().unwrap_or_else(|_| panic!("Test Failed"));
