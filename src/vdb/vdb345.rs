@@ -324,24 +324,29 @@ where
         }
 
         let mut f_neighbours: Vec<Vector3<i32>> = vec![];
+        let mut b_neighbours: Vec<Vector3<i32>> = vec![];
 
         for dy in [-1, 0, 1] {
             for dz in [-1, 0, 1] {
                 f_neighbours.push([-1, dy, dz].into());
+                b_neighbours.push([1, dy, dz].into());
             }
         }
 
         for dz in [-1, 0, 1] {
             f_neighbours.push([0, -1, dz].into());
+            b_neighbours.push([0, 1, dz].into());
         }
 
         f_neighbours.push([0, 0, -1].into());
+        b_neighbours.push([0, 0, 1].into());
 
-        // Node4 tiles first pass
+        // Strap yourself in for the ugliest code in the world!
+        // Good luck
         unsafe {
-            // borrow checker go brr
             let root_ptr = &mut self.root as *mut Root345<ValueType>;
 
+            // Forward pass
             for (&origin5, root_data) in (*root_ptr).map.iter_mut().sorted_by_key(|(key, _)| *key) {
                 let RootData::Node(node5) = root_data else {
                     // TODO: handle node5 tiles (if we actually need to?)
@@ -349,19 +354,22 @@ where
                 };
 
                 let origin5: Vector3<i32> = origin5.into();
-                // borrow checker go brr
 
-                let node5_ptr = &mut *node5 as *mut Box<N5<ValueType>>;
+                let node5_ptr = &*node5 as *const Box<N5<ValueType>>;
                 for (n4i, node5_data) in node5.data.iter_mut().enumerate() {
+                    let child5 = <N5<ValueType>>::offset_to_child(n4i);
+                    let global: Vector3<i32> =
+                        origin5 + child5.map(|x| x as i32) * <N4<ValueType>>::TOTAL_DIM as i32;
+
                     match node5_data {
                         InternalData::Tile(tile_value) => {
-                            let child5 = <N5<ValueType>>::offset_to_child(n4i);
-                            let global: Vector3<i32> = origin5 + child5.map(|x| x as i32);
-
                             for dn in &f_neighbours {
                                 let nchild5 = child5.map(|x| x as i32) + dn;
-                                let nglobal = origin5 + nchild5;
-                                if <N5<ValueType>>::global_to_node(nglobal) == global {
+                                let nglobal = global + dn * <N4<ValueType>>::TOTAL_DIM as i32;
+
+                                if <N5<ValueType>>::global_to_node(nglobal)
+                                    == <N5<ValueType>>::global_to_node(global)
+                                {
                                     let nid =
                                         <N5<ValueType>>::child_to_offset(nchild5.map(|x| x as u32));
                                     match (*node5_ptr).data[nid] {
@@ -377,26 +385,285 @@ where
                                 }
 
                                 let endpoint = self.get_voxel(nglobal);
-                                match endpoint {
-                                    VdbEndpoint::Innr(v, 5) => {
-                                        *tile_value = (*tile_value).min(v + 1);
-                                    }
-                                    _ => {
-                                        *tile_value = 1;
-                                    }
+                                *tile_value = match endpoint {
+                                    VdbEndpoint::Innr(v, 5) => (*tile_value).min(v + 1),
+                                    _ => 1,
                                 }
                             }
                         }
                         InternalData::Node(node4) => {
+                            let node4_ptr = &*node4 as *const Box<N4<ValueType>>;
                             for (n3i, node4_data) in node4.data.iter_mut().enumerate() {
                                 let child4 = <N4<ValueType>>::offset_to_child(n3i);
+                                let global: Vector3<i32> = global
+                                    + child4.map(|x| x as i32) * <N3<ValueType>>::TOTAL_DIM as i32;
+
+                                match node4_data {
+                                    InternalData::Tile(tile_value) => {
+                                        for dn in &f_neighbours {
+                                            let nchild4 = child4.map(|x| x as i32) + dn;
+                                            let nglobal =
+                                                global + dn * <N3<ValueType>>::TOTAL_DIM as i32;
+
+                                            if <N4<ValueType>>::global_to_node(nglobal)
+                                                == <N4<ValueType>>::global_to_node(global)
+                                            {
+                                                let nid = <N4<ValueType>>::child_to_offset(
+                                                    nchild4.map(|x| x as u32),
+                                                );
+
+                                                match (*node4_ptr).data[nid] {
+                                                    InternalData::Node(_) => {
+                                                        *tile_value = 1;
+                                                        break;
+                                                    }
+                                                    InternalData::Tile(v) => {
+                                                        *tile_value = (*tile_value).min(v + 1);
+                                                        continue;
+                                                    }
+                                                }
+                                            }
+
+                                            let endpoint = self.get_voxel(nglobal);
+                                            *tile_value = match endpoint {
+                                                VdbEndpoint::Innr(v, 4) => (*tile_value).min(v + 1),
+                                                _ => 1,
+                                            }
+                                        }
+                                    }
+                                    InternalData::Node(node3) => {
+                                        let node3_ptr = &*node3 as *const Box<N3<ValueType>>;
+                                        for (vi, node3_data) in node3.data.iter_mut().enumerate() {
+                                            let child3 = <N3<ValueType>>::offset_to_child(vi);
+                                            let global: Vector3<i32> =
+                                                global + child3.map(|x| x as i32);
+
+                                            let LeafData::Tile(tile_value) = node3_data else {
+                                                continue;
+                                            };
+
+                                            for dn in &f_neighbours {
+                                                let nchild3 = child3.map(|x| x as i32) + dn;
+                                                let nglobal = global + dn;
+                                                if <N3<ValueType>>::global_to_node(nglobal)
+                                                    == <N3<ValueType>>::global_to_node(global)
+                                                {
+                                                    let nid = <N3<ValueType>>::child_to_offset(
+                                                        nchild3.map(|x| x as u32),
+                                                    );
+
+                                                    match (*node3_ptr).data[nid] {
+                                                        LeafData::Value(_) => {
+                                                            *tile_value = 1;
+                                                            break;
+                                                        }
+                                                        LeafData::Tile(v) => {
+                                                            *tile_value = (*tile_value).min(v + 1);
+                                                            continue;
+                                                        }
+                                                    }
+                                                }
+
+                                                let endpoint = self.get_voxel(nglobal);
+                                                *tile_value = match endpoint {
+                                                    VdbEndpoint::Offs(v) => {
+                                                        (*tile_value).min(v + 1)
+                                                    }
+                                                    _ => 1,
+                                                };
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Backward pass
+            for (&origin5, root_data) in (*root_ptr)
+                .map
+                .iter_mut()
+                .sorted_by_key(|(key, _)| *key)
+                .rev()
+            {
+                let RootData::Node(node5) = root_data else {
+                    // TODO: handle node5 tiles (if we actually need to?)
+                    continue;
+                };
+
+                let origin5: Vector3<i32> = origin5.into();
+
+                let node5_ptr = &*node5 as *const Box<N5<ValueType>>;
+                for (n4i, node5_data) in node5.data.iter_mut().enumerate().rev() {
+                    let child5 = <N5<ValueType>>::offset_to_child(n4i);
+                    let global: Vector3<i32> =
+                        origin5 + child5.map(|x| x as i32) * <N4<ValueType>>::TOTAL_DIM as i32;
+
+                    match node5_data {
+                        InternalData::Tile(tile_value) => {
+                            for dn in &b_neighbours {
+                                let nchild5 = child5.map(|x| x as i32) + dn;
+                                let nglobal = global + dn * <N4<ValueType>>::TOTAL_DIM as i32;
+
+                                if <N5<ValueType>>::global_to_node(nglobal)
+                                    == <N5<ValueType>>::global_to_node(global)
+                                {
+                                    let nid =
+                                        <N5<ValueType>>::child_to_offset(nchild5.map(|x| x as u32));
+                                    match (*node5_ptr).data[nid] {
+                                        InternalData::Node(_) => {
+                                            *tile_value = 1;
+                                            break;
+                                        }
+                                        InternalData::Tile(v) => {
+                                            *tile_value = (*tile_value).min(v + 1);
+                                            continue;
+                                        }
+                                    }
+                                }
+
+                                let endpoint = self.get_voxel(nglobal);
+                                *tile_value = match endpoint {
+                                    VdbEndpoint::Innr(v, 5) => (*tile_value).min(v + 1),
+                                    _ => 1,
+                                }
+                            }
+                        }
+                        InternalData::Node(node4) => {
+                            let node4_ptr = &*node4 as *const Box<N4<ValueType>>;
+                            for (n3i, node4_data) in node4.data.iter_mut().enumerate().rev() {
+                                let child4 = <N4<ValueType>>::offset_to_child(n3i);
+                                let global: Vector3<i32> = global
+                                    + child4.map(|x| x as i32) * <N3<ValueType>>::TOTAL_DIM as i32;
+
+                                match node4_data {
+                                    InternalData::Tile(tile_value) => {
+                                        for dn in &b_neighbours {
+                                            let nchild4 = child4.map(|x| x as i32) + dn;
+                                            let nglobal =
+                                                global + dn * <N3<ValueType>>::TOTAL_DIM as i32;
+
+                                            if <N4<ValueType>>::global_to_node(nglobal)
+                                                == <N4<ValueType>>::global_to_node(global)
+                                            {
+                                                let nid = <N4<ValueType>>::child_to_offset(
+                                                    nchild4.map(|x| x as u32),
+                                                );
+
+                                                match (*node4_ptr).data[nid] {
+                                                    InternalData::Node(_) => {
+                                                        *tile_value = 1;
+                                                        break;
+                                                    }
+                                                    InternalData::Tile(v) => {
+                                                        *tile_value = (*tile_value).min(v + 1);
+                                                        continue;
+                                                    }
+                                                }
+                                            }
+
+                                            let endpoint = self.get_voxel(nglobal);
+                                            *tile_value = match endpoint {
+                                                VdbEndpoint::Innr(v, 4) => (*tile_value).min(v + 1),
+                                                _ => 1,
+                                            }
+                                        }
+                                    }
+                                    InternalData::Node(node3) => {
+                                        let node3_ptr = &*node3 as *const Box<N3<ValueType>>;
+                                        for (vi, node3_data) in
+                                            node3.data.iter_mut().enumerate().rev()
+                                        {
+                                            let child3 = <N3<ValueType>>::offset_to_child(vi);
+                                            let global: Vector3<i32> =
+                                                global + child3.map(|x| x as i32);
+
+                                            let LeafData::Tile(tile_value) = node3_data else {
+                                                continue;
+                                            };
+
+                                            for dn in &b_neighbours {
+                                                let nchild3 = child3.map(|x| x as i32) + dn;
+                                                let nglobal = global + dn;
+                                                if <N3<ValueType>>::global_to_node(nglobal)
+                                                    == <N3<ValueType>>::global_to_node(global)
+                                                {
+                                                    let nid = <N3<ValueType>>::child_to_offset(
+                                                        nchild3.map(|x| x as u32),
+                                                    );
+
+                                                    match (*node3_ptr).data[nid] {
+                                                        LeafData::Value(_) => {
+                                                            *tile_value = 1;
+                                                            break;
+                                                        }
+                                                        LeafData::Tile(v) => {
+                                                            *tile_value = (*tile_value).min(v + 1);
+                                                            continue;
+                                                        }
+                                                    }
+                                                }
+
+                                                let endpoint = self.get_voxel(nglobal);
+                                                *tile_value = match endpoint {
+                                                    VdbEndpoint::Offs(v) => {
+                                                        (*tile_value).min(v + 1)
+                                                    }
+                                                    _ => 1,
+                                                };
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        todo!()
+
+        // DEBUG
+        if cfg!(test) {
+            {
+                for (_, root_data) in self.root.map.iter().sorted_by_key(|(key, _)| *key) {
+                    let RootData::Node(node5) = root_data else {
+                        continue;
+                    };
+
+                    let mut out = String::new();
+
+                    let InternalData::Node(node4) = &node5.data[0] else {
+                        unreachable!();
+                    };
+
+                    let InternalData::Node(node3) = &node4.data[0] else {
+                        unreachable!();
+                    };
+
+                    for (vi, node3_data) in node3.data.iter().enumerate() {
+                        if vi as u64 % <N3<ValueType>>::DIM == 0 {
+                            out += "\n";
+                            if vi as u64 % (1 << <N3<ValueType>>::LOG2_DD) == 0 {
+                                out += "\n";
+                            }
+                        }
+
+                        match node3_data {
+                            LeafData::Value(_) => {
+                                out += "n ";
+                            }
+                            LeafData::Tile(v) => {
+                                out += &format!("{} ", v);
+                            }
+                        }
+                    }
+
+                    println!("{out}");
+                }
+            }
+        }
     }
 }
 
@@ -460,7 +727,7 @@ mod tests {
         let handler = builder
             .spawn(|| {
                 let mut vdb = <VDB345<u8>>::new();
-                let points = [[0, 0, 0], [-1, -1, 0]];
+                let points = &[[5, 6, 7], [-1, -1, 0]][..1];
                 for (i, &point) in points.iter().enumerate() {
                     vdb.set_voxel(point.into(), i as u8 + 1);
                 }

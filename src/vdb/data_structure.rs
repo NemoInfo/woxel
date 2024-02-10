@@ -27,6 +27,8 @@ pub trait Node {
     /// Total conceptual LOG2_D of child node
     const CHILD_TOTAL_LOG2_D: u64 = Self::TOTAL_LOG2_D - Self::LOG2_D;
     const DIM: u64 = 1 << Self::LOG2_D;
+    /// Total conceptual dimension
+    const TOTAL_DIM: u64 = 1 << Self::TOTAL_LOG2_D;
     /// Size of this node (i.e. length of data array)
     const SIZE: usize = 1 << (Self::LOG2_D * 3);
     /// Total conceptual size of node, including child size

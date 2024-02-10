@@ -95,7 +95,8 @@ impl WgpuContext {
 
         let f = std::fs::File::open("assets/utahteapot.vdb").unwrap();
         let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
-        let vdb = vdb_reader.read_vdb345_grid::<u32>("ls_utahteapot").unwrap();
+        let mut vdb = vdb_reader.read_vdb345_grid::<u32>("ls_utahteapot").unwrap();
+        vdb.compute_sdf();
 
         warn!("Loaded vdb");
         let atlas = vdb.atlas();
@@ -381,9 +382,11 @@ impl WgpuContext {
         let f = std::fs::File::open(model.path).unwrap();
         let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
         // TODO: Display vdb options and read accordingly
-        let vdb = vdb_reader
+        let mut vdb = vdb_reader
             .read_vdb345_grid::<u32>(&model.grid)
             .unwrap();
+
+        vdb.compute_sdf();
 
         let atlas = vdb.atlas();
 
