@@ -98,7 +98,7 @@ fn hdda_ray(src: vec3<f32>, dir: vec3<f32>) -> HDDAout {
         leaf = get_vdb_leaf_from_leaf(vec3<i32>(floor(p)), leaf);
 
         // Return intersected voxel
-        if !leaf.empty {
+        if leaf.dist == 0u {
             return HDDAout(0u, leaf, p, mask, i);
         }
 
@@ -109,9 +109,9 @@ fn hdda_ray(src: vec3<f32>, dir: vec3<f32>) -> HDDAout {
 
         var size: f32;
         switch leaf.num_parents {
-            case 3u: { size = scale[0u]; }
-            case 2u: { size = scale[1u]; }
-            case 1u: { size = scale[2u]; }
+            case 3u: { size = scale[0u]; } // SDF here gives visual artefacts
+            case 2u: { size = scale[1u] * f32(leaf.dist); }
+            case 1u: { size = scale[2u] * f32(leaf.dist); }
             case 0u: { size = scale[3u]; }
             default: { size = scale[0u]; }
         }
@@ -172,7 +172,7 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         case 2u: { // Ray length
             let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
             let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
-            let t = f32(hit.i) / f32(500u);
+            let t = f32(hit.i) / f32(200u);
 
             return grid + mix(color1, color2, t);
         }
@@ -205,7 +205,7 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         case 2u: {
             let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
             let color2: vec3<f32> = vec3(1.0, 0.0, 0.0); // Red
-            let t = f32(hit.i) / f32(500u);
+            let t = f32(hit.i) / f32(200u);
 
             return mix(color1, color2, t) + dot(vec3<f32>(hit.mask) * vec3(0.04, 0.08, 0.12), vec3(1.0));
         }
@@ -225,7 +225,7 @@ struct Parent {
 
 struct VdbLeaf {
     color: vec3<f32>,
-    empty: bool,
+    dist: u32,
     num_parents: u32,
     parents: array<Parent, 3>,
 }
@@ -285,7 +285,8 @@ fn get_vdb_leaf_from_nothing(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
         }
     }
 
-    return VdbLeaf(vec3<f32>(0.0), true, 0u, leaf.parents);
+    // Maybe I can change the 1 in the distance part
+    return VdbLeaf(vec3<f32>(0.0), 1u, 0u, leaf.parents);
 }
 
 fn get_vdb_leaf_from_node5(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
@@ -305,11 +306,11 @@ fn get_vdb_leaf_from_node5(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
     let node4_idx = textureLoad(node5s, node5_child + node5_atlas_origin, 0).r;
 
     if (in_val5) {
-        return VdbLeaf(vec3<f32>(0.2), false , 1u, leaf.parents);
+        return VdbLeaf(vec3<f32>(0.2), 0u, 1u, leaf.parents);
     }
 
     if (!in_kid5) {
-        return VdbLeaf(vec3<f32>(0.0), true , 1u, leaf.parents);
+        return VdbLeaf(vec3<f32>(0.0), (node4_idx), 1u, leaf.parents);
     }
 
     let node4_global = global_to_node(pos, NODE4_TOTAL_LOG_D);
@@ -337,10 +338,10 @@ fn get_vdb_leaf_from_node4(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
     let node3_idx = textureLoad(node4s, node4_child + node4_atlas_origin, 0).r;
 
     if (in_val4) {
-        return VdbLeaf(vec3<f32>(0.2), false , 2u, leaf.parents);
+        return VdbLeaf(vec3<f32>(0.2), 0u, 2u, leaf.parents);
     }
     if (!in_kid4) {
-        return VdbLeaf(vec3<f32>(0.0), true , 2u, leaf.parents);
+        return VdbLeaf(vec3<f32>(0.0), node3_idx, 2u, leaf.parents);
     }
 
     let node3_global = global_to_node(pos, NODE3_TOTAL_LOG_D);
@@ -364,9 +365,9 @@ fn get_vdb_leaf_from_node3(pos: vec3<i32>, leaff: VdbLeaf) -> VdbLeaf {
     let node3_atlas_origin = 8u * atlas_origin_from_idx(node3_idx, node3_atlas_dim);
     let voxel = textureLoad(node3s, node3_local + node3_atlas_origin, 0).r;
     if (in_val3) {
-        return VdbLeaf(vec3<f32>(0.1), false, 3u, leaf.parents);
+        return VdbLeaf(vec3<f32>(0.1), 0u, 3u, leaf.parents);
     }
-    return VdbLeaf(vec3<f32>(0.0), true, 3u, leaf.parents);
+    return VdbLeaf(vec3<f32>(0.0), voxel, 3u, leaf.parents);
 }
 
 

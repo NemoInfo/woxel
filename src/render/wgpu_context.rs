@@ -97,9 +97,9 @@ impl WgpuContext {
         let mut vdb_reader = VdbReader::new(BufReader::new(f)).unwrap();
         let mut vdb = vdb_reader.read_vdb345_grid::<u32>("ls_utahteapot").unwrap();
         vdb.compute_sdf();
-
         warn!("Loaded vdb");
         let atlas = vdb.atlas();
+
 
         let atlas_size = atlas
             .iter()

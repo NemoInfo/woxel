@@ -187,7 +187,7 @@ where
         let mut n4_idx: usize = 0;
         let mut n3_idx: usize = 0;
 
-        for (_origin, root_data) in self.root.map.iter().sorted_by_key(|(key, _)| *key) {
+        for (_, root_data) in self.root.map.iter().sorted_by_key(|(key, _)| *key) {
             let RootData::Node(node5) = root_data else {
                 // TODO: handle node5 tiles
                 continue;
@@ -195,8 +195,8 @@ where
             let n5_atlas_origin: Vector3<usize> =
                 origin_from_idx(n5_idx, n5_atlas_dim) * <N5<ValueType>>::DIM as usize;
 
-            for (offset, node5_data) in node5.data.iter().enumerate() {
-                let n5_data_rel: Vector3<usize> = <N5<ValueType>>::offset_to_child(offset)
+            for (offset5, node5_data) in node5.data.iter().enumerate() {
+                let n5_data_rel: Vector3<usize> = <N5<ValueType>>::offset_to_child(offset5)
                     .map(|c| c as usize)
                     .into();
 
@@ -213,8 +213,8 @@ where
                 let n4_atlas_origin: Vector3<usize> =
                     origin_from_idx(n4_idx, n4_atlas_dim) * <N4<ValueType>>::DIM as usize;
 
-                for (offset, node4_data) in node4.data.iter().enumerate() {
-                    let n4_data_rel: Vector3<usize> = <N4<ValueType>>::offset_to_child(offset)
+                for (offset4, node4_data) in node4.data.iter().enumerate() {
+                    let n4_data_rel: Vector3<usize> = <N4<ValueType>>::offset_to_child(offset4)
                         .map(|c| c as usize)
                         .into();
 
@@ -231,8 +231,8 @@ where
                     let n3_atlas_origin: Vector3<usize> =
                         origin_from_idx(n3_idx, n3_atlas_dim) * <N3<ValueType>>::DIM as usize;
 
-                    for (offset, node3_data) in node3.data.iter().enumerate() {
-                        let n3_data_rel: Vector3<usize> = <N3<ValueType>>::offset_to_child(offset)
+                    for (offset3, node3_data) in node3.data.iter().enumerate() {
+                        let n3_data_rel: Vector3<usize> = <N3<ValueType>>::offset_to_child(offset3)
                             .map(|c| c as usize)
                             .into();
 
@@ -295,27 +295,28 @@ where
                 continue;
             };
 
-            for node5_data in node5.data.iter_mut() {
+            for (_, node5_data) in node5.data.iter_mut().enumerate() {
                 if let InternalData::Tile(tile_value) = node5_data {
-                    // Set tile value to max
-                    *tile_value = u32::MAX;
+                    // Set tile value to max subtract 1 so adding 1 doesn't wrap around
+                    *tile_value = u32::MAX - 1;
                 }
                 let InternalData::Node(node4) = node5_data else {
                     continue;
                 };
 
-                for node4_data in node4.data.iter_mut() {
+                for (_, node4_data) in node4.data.iter_mut().enumerate() {
                     if let InternalData::Tile(tile_value) = node4_data {
-                        // Set tile value to max
-                        *tile_value = u32::MAX;
+                        // Set tile value to max subtract 1 so adding 1 doesn't wrap around
+                        *tile_value = u32::MAX - 1;
                     }
                     let InternalData::Node(node3) = node4_data else {
                         continue;
                     };
 
-                    for node3_data in node3.data.iter_mut() {
+                    for (_, node3_data) in node3.data.iter_mut().enumerate() {
                         if let LeafData::Tile(tile_value) = node3_data {
-                            *tile_value = usize::MAX;
+                            // Set tile value to max subtract 1 so adding 1 doesn't wrap around
+                            *tile_value = usize::MAX - 1;
                             continue;
                         }
                     }

@@ -91,7 +91,7 @@ pub trait Node {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LeafNode<ValueType, const LOG2_D: u64>
 where
     [(); ((1 << (LOG2_D * 3)) / 64) as usize]:,
@@ -153,13 +153,13 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LeafData<ValueType> {
     Tile(usize),
     Value(ValueType),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InternalNode<ValueType, ChildType, const LOG2_D: u64>
 where
     [(); (1 << (LOG2_D * 3)) as usize]:,
@@ -224,13 +224,13 @@ where
     const TOTAL_LOG2_D: u64 = LOG2_D + ChildType::TOTAL_LOG2_D;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InternalData<ChildType> {
     Node(Box<ChildType>),
     Tile(u32),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RootNode<ValueType, ChildType: Node>
 where
     ValueType: VdbValueType,
@@ -240,7 +240,7 @@ where
     pub background: ValueType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RootData<ChildType> {
     Node(Box<ChildType>),
     Tile(u32, bool),
@@ -268,7 +268,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VDB<ValueType, ChildType: Node>
 where
     ValueType: VdbValueType,
@@ -277,7 +277,7 @@ where
     pub grid_descriptor: GridDescriptor,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GridDescriptor {
     pub name: String,
     /// If not empty, the name of another grid that shares this grid's tree
@@ -334,7 +334,7 @@ where
 // This is a bit akward Root is actually just a Node5 tile
 // Inner(v, 5) is a Node4 tile
 // Inner(v, 4) is a Node3 tile
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum VdbEndpoint<ValueType> {
     Offs(usize),
     Leaf(ValueType),
@@ -343,7 +343,7 @@ pub enum VdbEndpoint<ValueType> {
     Bkgr(ValueType),
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Metadata(pub HashMap<String, MetadataValue>);
 
 impl Metadata {
@@ -393,7 +393,7 @@ pub struct NodeHeader<ValueType> {
     pub log_2_dim: u64,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct ArchiveHeader {
     /// The version of the file that was read
     pub file_version: u32,
