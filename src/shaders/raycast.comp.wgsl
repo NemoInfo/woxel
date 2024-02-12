@@ -107,12 +107,12 @@ fn hdda_ray(src: vec3<f32>, dir: vec3<f32>) -> HDDAout {
             return HDDAout(1u, leaf, p, mask, i);
         }
 
-        var size: f32;
+        var size = f32(leaf.dist);
         switch leaf.num_parents {
-            case 3u: { size = scale[0u]; } // SDF here gives visual artefacts
-            case 2u: { size = scale[1u] * f32(leaf.dist); }
-            case 1u: { size = scale[2u] * f32(leaf.dist); }
-            case 0u: { size = scale[3u]; }
+            case 3u: { size *= scale[0u]; }
+            case 2u: { size *= scale[1u]; }
+            case 1u: { size *= scale[2u]; }
+            case 0u: { size *= scale[3u]; }
             default: { size = scale[0u]; }
         }
 

@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use itertools::Itertools;
 
-use crate::vdb::{data_structure::*, From4LeBytes};
+use crate::vdb::data_structure::*;
 
 use super::VdbValueType;
 
@@ -207,7 +207,7 @@ where
                         unreachable!();
                     };
                     n5_atlas[n5_atlas_data_pos.x][n5_atlas_data_pos.y][n5_atlas_data_pos.z] =
-                        <ValueType as From4LeBytes>::from_4_le_bytes(node4_tile.to_le_bytes());
+                        ValueType::from_4_le_bytes(node4_tile.to_le_bytes());
                     continue;
                 };
                 let n4_atlas_origin: Vector3<usize> =
@@ -225,7 +225,7 @@ where
                             unreachable!();
                         };
                         n4_atlas[n4_atlas_data_pos.x][n4_atlas_data_pos.y][n4_atlas_data_pos.z] =
-                            <ValueType as From4LeBytes>::from_4_le_bytes(node3_tile.to_le_bytes());
+                            ValueType::from_4_le_bytes(node3_tile.to_le_bytes());
                         continue;
                     };
                     let n3_atlas_origin: Vector3<usize> =

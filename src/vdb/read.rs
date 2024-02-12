@@ -612,7 +612,12 @@ impl<R: Read + Seek> VdbReader<R> {
                     )?;
 
                     for idx in 0..data.len() {
-                        if value_mask[idx] {
+                        // HACK:
+                        // It looks like the initial value mask given in the previous Node4 section is the correct one,
+                        // I am not sure that the actual data of the voxel is being read properly (it is probably not)
+                        // I think using the previous value mask just gives the correct topology but probably the value of the voxels
+                        // is not the one that was intended, I need to reinvestigate how the file encoding is done
+                        if (node_3.value_mask[idx >> 6] & (1 << (idx & 63))) != 0 {
                             node_3.data[idx] = LeafData::Value(data[idx]);
                         }
                     }
