@@ -343,6 +343,8 @@ where
         b_neighbours.push([0, 0, 1].into());
 
         // Strap yourself in for the ugliest code in the world!
+        // If I wanted to use safe code I would either have to use Rc<Refcell<T>> instead of Box on the VDB or
+        //  clone the tree and deffer updates to it later, and I don't wanna do that
         // Good luck
         unsafe {
             let root_ptr = &mut self.root as *mut Root345<ValueType>;

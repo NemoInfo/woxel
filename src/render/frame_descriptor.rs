@@ -97,4 +97,21 @@ impl FrameDescriptor {
     ) -> (Texture, BindGroup, BindGroupLayout) {
         FragmentTexture::new(size).bind(device)
     }
+
+    pub fn create_recording_buffer(device: &Device, [width, height]: [u32; 2]) -> Buffer {
+        let bytes_per_pixel = 4;
+        let unaligned_row_size = width * bytes_per_pixel;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as u32;
+        let aligned_row_size = (unaligned_row_size + align - 1) / align * align;
+        let buffer_size = (aligned_row_size * height) as u64;
+
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Recording Buffer"),
+            size: buffer_size,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        buffer
+    }
 }

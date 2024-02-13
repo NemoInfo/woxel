@@ -145,6 +145,7 @@ impl WgpuContext {
             );
         }
 
+        // TODO: Maybe export this to a function in FrameDescriptor
         let (mask_buffers, mask_buffers_contents, mask_bind_group, mask_bind_group_layout) =
             MaskUniform::from(&vdb).bind(&device);
 
@@ -339,8 +340,31 @@ impl WgpuContext {
         self.queue
             .write_buffer(&compute_state_buffer, 0, &compute_state_buffer_contents);
 
+
+        // Capture screen
+        let recording_buffer = FrameDescriptor::create_recording_buffer(&self.device, self.size.into());
+
+        encoder.copy_texture_to_buffer(
+            output.texture.as_image_copy(),
+            wgpu::ImageCopyBufferBase {
+                buffer: &recording_buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row:
+                    Some(self.size.width * 4), rows_per_image:
+                    Some(self.size.height)
+                }
+            },
+            wgpu::Extent3d {
+                width: self.size.width,
+                height: self.size.height,
+                depth_or_array_layers: 1 }
+        );
+
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+
+
         self.egui_rpass
             .remove_textures(tdelta)
             .expect("remove textures ok");
