@@ -1,12 +1,13 @@
-use std::{collections::HashMap, io::BufReader};
+use std::{collections::HashMap, io::BufReader, sync::Arc};
 
 use log::warn;
-use wgpu::{BindGroup, BindGroupLayout, Buffer, ShaderModule, Texture};
+use wgpu::{BindGroup, BindGroupLayout, Buffer, BufferAsyncError, ShaderModule, Texture};
 use winit::window::Window;
 
 use crate::{render::gpu_types::MaskUniform, scene::Scene, vdb::VdbReader};
 
 use super::{
+    recorder::{Frame, FrameRecorder},
     egui_dev::{EguiDev, VdbFile},
     frame_descriptor::FrameDescriptor,
     pipelines::{CPipeline, ComputePipeline, Pipeline, VoxelPipeline},
@@ -23,11 +24,15 @@ pub struct WgpuContext {
     atlas_group: ([Texture; 3], BindGroup, BindGroupLayout),
     masks_group: ([Buffer; 6], [Vec<u8>; 6], BindGroup, BindGroupLayout),
     shaders: HashMap<&'static str, ShaderModule>,
+    frame_recorder: Arc<FrameRecorder>,
+    rt: tokio::runtime::Runtime,
     _textures: HashMap<&'static str, (Texture, BindGroup, BindGroupLayout)>,
 }
 
 impl WgpuContext {
     pub async fn new(window: &Window) -> Self {
+        let rt = tokio::runtime::Runtime::new().expect("Failed tp create tokio runtime");
+
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -168,6 +173,9 @@ impl WgpuContext {
 
         let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
 
+        let mut frame_recorder = FrameRecorder::new();
+        frame_recorder.start_encoding_thread();
+
         Self {
             surface,
             device,
@@ -184,6 +192,8 @@ impl WgpuContext {
             ),
             atlas_group: (atlas_textures, bind_group, bind_group_layout),
             shaders: HashMap::new(),
+            frame_recorder: Arc::new(frame_recorder),
+            rt,
             _textures: HashMap::new(),
         }
     }
@@ -345,7 +355,7 @@ impl WgpuContext {
         let recording_buffer = FrameDescriptor::create_recording_buffer(&self.device, self.size.into());
 
         encoder.copy_texture_to_buffer(
-            output.texture.as_image_copy(),
+            compute_texture.as_image_copy(),
             wgpu::ImageCopyBufferBase {
                 buffer: &recording_buffer,
                 layout: wgpu::ImageDataLayout {
@@ -362,8 +372,10 @@ impl WgpuContext {
         );
 
         self.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
 
+        self.send_recording_buffer(&recording_buffer);
+
+        output.present();
 
         self.egui_rpass
             .remove_textures(tdelta)
@@ -374,6 +386,57 @@ impl WgpuContext {
         }
 
         Ok(())
+    }
+
+    pub fn send_recording_buffer(&self, buffer: &Buffer) {
+        let staging_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Staging Buffer"),
+            size: buffer.size(),
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+           label: Some("Buffer to Vec encoder")
+        });
+
+        encoder.copy_buffer_to_buffer(buffer, 0, &staging_buffer, 0, buffer.size());
+        self.queue.submit(Some(encoder.finish()));
+
+        let (sender, receiver) = futures::channel::oneshot::channel::<Result<(), BufferAsyncError>>();
+
+
+        staging_buffer.slice(..).map_async(wgpu::MapMode::Read, move |result| {
+            if result.is_ok() {
+                sender.send(Ok(())).expect("Failed to map");
+            }
+        });
+
+        let size = self.size.into();
+        let frame_recorder = self.frame_recorder.clone();
+
+        let completion_fututre = async move {
+            match receiver.await {
+                Ok(_) => {
+                    let data = staging_buffer.slice(..).get_mapped_range();
+                    let result = data.to_vec();
+                    drop(data);
+                    staging_buffer.unmap();
+
+                    let frame = Frame {
+                        data: result,
+                        size,
+                    };
+
+                    frame_recorder.send_frame(frame);
+                },
+                Err(_) => {
+                    panic!("Oops")
+                }
+            }
+        };
+
+        self.rt.spawn(completion_fututre);
     }
 
     /// Loads shaders at compile time

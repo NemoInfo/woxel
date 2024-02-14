@@ -108,7 +108,7 @@ impl FrameDescriptor {
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Recording Buffer"),
             size: buffer_size,
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
 

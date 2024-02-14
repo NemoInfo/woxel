@@ -7,7 +7,7 @@
 
 # woxel
 Web compatible voxel rendering engine. <br/>
-The engine uses the VDB345[^1] data structure. It then performs HDDA[^3] in compute shaders to render the model.
+The engine uses the VDB345[^1] data structure. It then performs a custom DDA based on the HDDA[^3] paper, combined with a grid SDF, in compute shaders, to render the model.
 
 ![](photos/woxel_dragon.png) 
 
