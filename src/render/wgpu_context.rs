@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::BufReader, sync::Arc};
+use std::{collections::HashMap, io::BufReader, sync::{Arc, Mutex}};
 
 use log::warn;
 use wgpu::{BindGroup, BindGroupLayout, Buffer, BufferAsyncError, ShaderModule, Texture};
@@ -24,7 +24,7 @@ pub struct WgpuContext {
     atlas_group: ([Texture; 3], BindGroup, BindGroupLayout),
     masks_group: ([Buffer; 6], [Vec<u8>; 6], BindGroup, BindGroupLayout),
     shaders: HashMap<&'static str, ShaderModule>,
-    frame_recorder: Arc<FrameRecorder>,
+    pub frame_recorder: Arc<Mutex<FrameRecorder>>,
     rt: tokio::runtime::Runtime,
     _textures: HashMap<&'static str, (Texture, BindGroup, BindGroupLayout)>,
 }
@@ -192,7 +192,7 @@ impl WgpuContext {
             ),
             atlas_group: (atlas_textures, bind_group, bind_group_layout),
             shaders: HashMap::new(),
-            frame_recorder: Arc::new(frame_recorder),
+            frame_recorder: Arc::new(Mutex::new(frame_recorder)),
             rt,
             _textures: HashMap::new(),
         }
@@ -428,7 +428,7 @@ impl WgpuContext {
                         size,
                     };
 
-                    frame_recorder.send_frame(frame);
+                    frame_recorder.lock().expect("shit").send_frame(frame);
                 },
                 Err(_) => {
                     panic!("Oops")

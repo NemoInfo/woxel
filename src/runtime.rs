@@ -55,7 +55,14 @@ impl Runtime {
                                 ..
                             },
                         ..
-                    } => *control_flow = ControlFlow::Exit,
+                    } => {
+                        *control_flow = ControlFlow::Exit;
+                        self.context
+                            .frame_recorder
+                            .lock()
+                            .expect("Fuck me")
+                            .end_encoder();
+                    }
                     WindowEvent::Resized(physical_size) => {
                         self.context.resize(*physical_size);
                         self.scene.state.resolution = (*physical_size).into();
