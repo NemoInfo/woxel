@@ -57,11 +57,13 @@ impl Runtime {
                         ..
                     } => {
                         *control_flow = ControlFlow::Exit;
-                        self.context
-                            .frame_recorder
-                            .lock()
-                            .expect("Fuck me")
-                            .end_encoder();
+                        match self.context.frame_recorder.take() {
+                            Some(fr) => fr
+                                .lock()
+                                .expect("Could not aquire frame recorder")
+                                .end_encoder(),
+                            _ => {}
+                        }
                     }
                     WindowEvent::Resized(physical_size) => {
                         self.context.resize(*physical_size);

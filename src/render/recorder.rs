@@ -14,6 +14,7 @@ use video_rs::{Encoder, EncoderSettings, Locator, Time};
 pub struct Frame {
     pub data: Vec<u8>,
     pub size: [u32; 2],
+    pub time: std::time::Instant,
 }
 
 impl Frame {
@@ -40,14 +41,15 @@ pub struct FrameRecorder {
     receiver: Arc<Mutex<Receiver<Frame>>>,
     encoding_thread: Option<thread::JoinHandle<()>>,
     encoder: Arc<Mutex<Encoder>>,
+    pub prev_frame_time: std::time::Instant,
 }
 
 impl FrameRecorder {
-    pub fn new() -> Self {
+    pub fn new(output_path: PathBuf) -> Self {
         let (sender, reciever) = mpsc::channel();
         let receiver = Arc::new(Mutex::new(reciever));
 
-        let destination: Locator = PathBuf::from("out.mp4").into();
+        let destination: Locator = output_path.into();
         let settings = EncoderSettings::for_h264_yuv420p(1600, 900, false);
 
         let encoder = Encoder::new(&destination, settings).expect("failed to create encoder");
@@ -58,21 +60,23 @@ impl FrameRecorder {
             receiver,
             encoding_thread: None,
             encoder,
+            prev_frame_time: std::time::Instant::now(),
         }
     }
 
     pub fn start_encoding_thread(&mut self) {
         let receiver = Arc::clone(&self.receiver);
 
-        let duration: Time = Time::from_nth_of_a_second(24);
-        let mut position = Time::zero();
         let mut i = 0;
 
         let encoder_ptr = Arc::clone(&self.encoder);
         self.encoding_thread = Some(thread::spawn(move || {
             let receiver = receiver.lock().unwrap();
 
+            let mut prev_time = std::time::Instant::now();
+            let mut position = Time::zero();
             while let Ok(frame) = receiver.recv() {
+                println!("Encoding {i}");
                 i += 1;
 
                 encoder_ptr
@@ -81,18 +85,19 @@ impl FrameRecorder {
                     .encode(&frame.ndarray_frame(), &position)
                     .expect("failed to encode frame");
 
-                println!("Encoded {i}");
-
-                // Update the current position and add the inter-frame
-                // duration to it.
-                position = position.aligned_with(&duration).add();
+                let elapsed = Time::from_secs_f64((frame.time - prev_time).as_secs_f64());
+                position = position.aligned_with(&elapsed).add();
+                prev_time = frame.time;
             }
         }))
     }
 
-    pub fn send_frame(&self, frame: Frame) {
+    pub fn send_frame(&mut self, frame: Frame) {
         match &self.sender {
-            Some(s) => s.send(frame).expect("Failed to send frame"),
+            Some(s) => {
+                s.send(frame).expect("Failed to send frame");
+                self.prev_frame_time = std::time::Instant::now();
+            }
             _ => {
                 println!("No sender to send frame")
             }
@@ -115,7 +120,7 @@ impl FrameRecorder {
     }
 }
 
-fn srgb_to_linear(value: u8) -> u8 {
+fn _srgb_to_linear(value: u8) -> u8 {
     let c = value as f32 / 255.0; // Normalize to 0..1
     let linear = if c <= 0.04045 {
         c / 12.92

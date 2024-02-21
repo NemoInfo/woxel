@@ -24,7 +24,7 @@ pub struct WgpuContext {
     atlas_group: ([Texture; 3], BindGroup, BindGroupLayout),
     masks_group: ([Buffer; 6], [Vec<u8>; 6], BindGroup, BindGroupLayout),
     shaders: HashMap<&'static str, ShaderModule>,
-    pub frame_recorder: Arc<Mutex<FrameRecorder>>,
+    pub frame_recorder: Option<Arc<Mutex<FrameRecorder>>>,
     rt: tokio::runtime::Runtime,
     _textures: HashMap<&'static str, (Texture, BindGroup, BindGroupLayout)>,
 }
@@ -173,9 +173,6 @@ impl WgpuContext {
 
         let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
 
-        let mut frame_recorder = FrameRecorder::new();
-        frame_recorder.start_encoding_thread();
-
         Self {
             surface,
             device,
@@ -192,7 +189,7 @@ impl WgpuContext {
             ),
             atlas_group: (atlas_textures, bind_group, bind_group_layout),
             shaders: HashMap::new(),
-            frame_recorder: Arc::new(Mutex::new(frame_recorder)),
+            frame_recorder: None,
             rt,
             _textures: HashMap::new(),
         }
@@ -320,7 +317,7 @@ impl WgpuContext {
             render_pass.draw_indexed(0..num_indices, 0, 0..1);
         }
 
-        let (tdelta, paint_jobs, screen_descriptor, model_changed, reload_shaders) = self.egui_dev.get_frame(scene, window);
+        let (tdelta, paint_jobs, screen_descriptor, model_changed, reload_shaders, recording_changed) = self.egui_dev.get_frame(scene, window);
 
         // @HACK: refactor egui out and get shader from context
         if reload_shaders {
@@ -350,30 +347,61 @@ impl WgpuContext {
         self.queue
             .write_buffer(&compute_state_buffer, 0, &compute_state_buffer_contents);
 
+        if recording_changed {
+            if self.egui_dev.recording {
+                let mut fr = FrameRecorder::new(self.egui_dev.recording_file.clone().into());
+                fr.start_encoding_thread();
+                self.frame_recorder = Some(Arc::new(Mutex::new(fr)));
+            } else {
+                match self.frame_recorder.take() {
+                    Some(fr) => {
+                        self.rt.spawn(async move {
+                            fr.lock()
+                              .expect("Could not aquire frame recorder")
+                              .end_encoder();
+                        });
+                    }
+                    _ => {
+                        println!("This would be strange");
+                   }
+                }
+            }
+        }
 
         // Capture screen
-        let recording_buffer = FrameDescriptor::create_recording_buffer(&self.device, self.size.into());
+        let should_capture = match &self.frame_recorder {
+            Some(fr) => fr.lock().expect("failed to get recording lock").prev_frame_time.elapsed().as_millis() > 33,
+            None => false,
+        };
 
-        encoder.copy_texture_to_buffer(
-            compute_texture.as_image_copy(),
-            wgpu::ImageCopyBufferBase {
-                buffer: &recording_buffer,
-                layout: wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row:
-                    Some(self.size.width * 4), rows_per_image:
-                    Some(self.size.height)
-                }
-            },
-            wgpu::Extent3d {
-                width: self.size.width,
-                height: self.size.height,
-                depth_or_array_layers: 1 }
-        );
+        if should_capture{
+            let recording_buffer = FrameDescriptor::create_recording_buffer(&self.device, self.size.into());
 
-        self.queue.submit(std::iter::once(encoder.finish()));
+            encoder.copy_texture_to_buffer(
+                compute_texture.as_image_copy(),
+                wgpu::ImageCopyBufferBase {
+                    buffer: &recording_buffer,
+                    layout: wgpu::ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row:
+                        Some(self.size.width * 4), rows_per_image:
+                        Some(self.size.height)
+                    }
+                },
+                wgpu::Extent3d {
+                    width: self.size.width,
+                    height: self.size.height,
+                    depth_or_array_layers: 1 }
+            );
 
-        self.send_recording_buffer(&recording_buffer);
+            self.queue.submit(std::iter::once(encoder.finish()));
+
+            self.send_recording_buffer(&recording_buffer);
+        }
+        else {
+            self.queue.submit(std::iter::once(encoder.finish()));
+        }
+
 
         output.present();
 
@@ -389,6 +417,10 @@ impl WgpuContext {
     }
 
     pub fn send_recording_buffer(&self, buffer: &Buffer) {
+        let Some(frame_recorder) = self.frame_recorder.clone() else {
+            unreachable!();
+        };
+
         let staging_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Staging Buffer"),
             size: buffer.size(),
@@ -399,6 +431,8 @@ impl WgpuContext {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
            label: Some("Buffer to Vec encoder")
         });
+
+        let frame_time = std::time::Instant::now();
 
         encoder.copy_buffer_to_buffer(buffer, 0, &staging_buffer, 0, buffer.size());
         self.queue.submit(Some(encoder.finish()));
@@ -413,8 +447,6 @@ impl WgpuContext {
         });
 
         let size = self.size.into();
-        let frame_recorder = self.frame_recorder.clone();
-
         let completion_fututre = async move {
             match receiver.await {
                 Ok(_) => {
@@ -426,6 +458,7 @@ impl WgpuContext {
                     let frame = Frame {
                         data: result,
                         size,
+                        time: frame_time,
                     };
 
                     frame_recorder.lock().expect("shit").send_frame(frame);

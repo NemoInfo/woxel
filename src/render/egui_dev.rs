@@ -39,6 +39,8 @@ pub struct EguiDev {
     pub show_grid: [bool; 3],
     pub models: Vec<VdbFile>,
     pub sun_settings: SunSettings,
+    pub recording: bool,
+    pub recording_file: String,
     last_fps_update: Instant,
     time_last_frame: Instant,
     past_fps: Vec<f32>,
@@ -58,6 +60,8 @@ impl EguiDev {
             time_last_frame: Instant::now(),
             current_fps: 0.,
             past_fps: vec![0.0; 200],
+            recording: false,
+            recording_file: "output.mp4".to_string(),
         }
     }
 
@@ -69,6 +73,7 @@ impl EguiDev {
         TexturesDelta,
         Vec<ClippedPrimitive>,
         ScreenDescriptor,
+        bool,
         bool,
         bool,
     ) {
@@ -90,6 +95,7 @@ impl EguiDev {
 
         let mut model_changed = false;
         let mut reload_shaders = false;
+        let mut recording_changed = false;
         egui::Window::new("Developer tools")
             .title_bar(false)
             .resizable(true)
@@ -218,6 +224,26 @@ impl EguiDev {
                 if self.render_mode == RenderMode::Diffuse {
                     self.sun_settings.get_frame(ui);
                 }
+
+                ui.collapsing(
+                    RichText::new("Recording Menu").font(FontId::proportional(15.0)),
+                    |ui| {
+                        if !self.recording {
+                            let response = ui.button(
+                                RichText::new("Start Recording").font(FontId::proportional(15.0)),
+                            );
+                            recording_changed = response.clicked();
+                            self.recording = response.clicked();
+                        } else {
+                            let response = ui.button(
+                                RichText::new("End Recording").font(FontId::proportional(15.0)),
+                            );
+                            self.recording = !response.clicked();
+                            recording_changed = response.clicked();
+                        }
+                        ui.text_edit_singleline(&mut self.recording_file);
+                    },
+                )
             });
 
         let full_output = self.platform.end_frame(Some(&window));
@@ -230,6 +256,7 @@ impl EguiDev {
             screen_descriptor,
             model_changed,
             reload_shaders,
+            recording_changed,
         )
     }
 
