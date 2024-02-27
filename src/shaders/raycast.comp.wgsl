@@ -167,7 +167,7 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             return grid + dot(vec3<f32>(hit.mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
         }
         case 1u: { // Rgb
-            return grid + vec3(0.1) + vec3<f32>(hit.mask) * vec3(0.1, 0.2, 0.3);
+            return grid + vec3(0.1) + vec3<f32>(hit.mask) * vec3(0.4, 0.4, 0.4);
         }
         case 2u: { // Ray length
             let color1: vec3<f32> = vec3(0.72, 1.0, 0.99); // Light Blue
@@ -177,12 +177,12 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             return grid + mix(color1, color2, t);
         }
         case 3u {
-            // We are in ray trace mode => check clear path to sun
+            var I = s.sun_color.a * k_d * dot(s.sun_dir, normalize(step * vec3<f32>(hit.mask)));
+            // If angle is obtouse, that side is in shadow
+            I = max(0.0, I);
 
-            let hit2: HDDAout = hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir);
-            let I = s.sun_color.a * k_d * dot(s.sun_dir, normalize(step * vec3<f32>(hit.mask)));
-
-            if hit2.state == 0u {
+            if I != 0.0  &&
+               hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir).state == 0u {
                 return vec3(0.1) + I * s.sun_color.xyz * 0.05;
             }
 
