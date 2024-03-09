@@ -85,9 +85,9 @@ impl FrameRecorder {
                     .encode(&frame.ndarray_frame(), &position)
                     .expect("failed to encode frame");
 
-                let elapsed = Time::from_secs_f64((frame.time - prev_time).as_secs_f64());
+                let elapsed = Time::from_secs_f64(prev_time.elapsed().as_secs_f64());
                 position = position.aligned_with(&elapsed).add();
-                prev_time = frame.time;
+                prev_time = std::time::Instant::now();
             }
         }))
     }

@@ -14,6 +14,7 @@ pub enum RenderMode {
     Rgb,
     Ray,
     Diffuse,
+    Glossy,
 }
 
 impl RenderMode {
@@ -23,6 +24,7 @@ impl RenderMode {
             Self::Rgb => "Rgb",
             Self::Ray => "Ray",
             Self::Diffuse => "Diffuse",
+            Self::Glossy => "Glossy",
         })
     }
 
@@ -193,6 +195,11 @@ impl EguiDev {
                         &mut self.render_mode,
                         RenderMode::Diffuse,
                         RenderMode::Diffuse.rich_text(),
+                    );
+                    ui.selectable_value(
+                        &mut self.render_mode,
+                        RenderMode::Glossy,
+                        RenderMode::Glossy.rich_text(),
                     );
                 });
 

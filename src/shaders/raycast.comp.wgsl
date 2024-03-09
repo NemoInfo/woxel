@@ -146,6 +146,7 @@ struct HDDAout {
     i: u32,
 }
 
+const REFLECTIVITY: f32 = 0.3;
 fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let hit: HDDAout = hdda_ray(src, dir);
     let step: vec3<f32> = sign11(dir);
@@ -176,8 +177,9 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 
             return grid + mix(color1, color2, t);
         }
-        case 3u {
-            var I = s.sun_color.a * k_d * dot(s.sun_dir, normalize(step * vec3<f32>(hit.mask)));
+        case 3u: {
+            let N = normalize(-step * vec3<f32>(hit.mask));
+            var I = s.sun_color.a * k_d * dot(-s.sun_dir, N);
             // If angle is obtouse, that side is in shadow
             I = max(0.0, I);
 
@@ -187,6 +189,33 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             }
 
             return vec3(0.1) + I * s.sun_color.xyz;
+        }
+        case 4u: {
+            let N = normalize(-step * vec3<f32>(hit.mask));
+
+            // Maybe do this only if material is reflective
+            // Rr = Ri - 2N(Ri*N)
+            let rdir = normalize(dir - 2.0 * N * dot(dir, N));
+
+            // Avoid self-intersection
+            let rsrc = hit.p - 4e-2 * step * vec3<f32>(hit.mask);
+
+            let rcol = reflect_ray2(rsrc, rdir);
+
+            var mcol: vec3<f32>;
+            var I = s.sun_color.a * k_d * dot(-s.sun_dir, N);
+            // If angle is obtouse, that side is in shadow
+            I = max(0.0, I);
+
+            if I != 0.0  &&
+               hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir).state == 0u {
+                mcol = vec3(0.1) + I * s.sun_color.xyz * 0.05;
+            }
+            else {
+                mcol = vec3(0.1) + I * s.sun_color.xyz;
+            }
+
+            return mix(mcol, rcol, REFLECTIVITY);
         }
         default: {
             return grid + dot(vec3<f32>(hit.mask) * vec3(0.2, 0.2, 0.3), vec3(1.0));
@@ -209,10 +238,99 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 
             return mix(color1, color2, t) + dot(vec3<f32>(hit.mask) * vec3(0.04, 0.08, 0.12), vec3(1.0));
         }
+        case 4u: {
+            let N = normalize(-step * vec3<f32>(hit.mask));
+            let Np = max(vec3(0.0), N);
+            let Nn = -min(vec3(0.0), N);
+
+            return vec3<f32>(1.0, 0.0, 0.0) * Np.x +
+                vec3<f32>(0.0, 1.0, 0.0) * Np.y +
+                vec3<f32>(0.0, 0.0, 1.0) * Np.z +
+                vec3<f32>(1.0, 1.0, 0.0) * Nn.x +
+                vec3<f32>(0.0, 1.0, 1.0) * Nn.y +
+                vec3<f32>(1.0, 0.0, 1.0) * Nn.z;
+        }
         default: {
-            return vec3(0.0) + dot(vec3<f32>(hit.mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
+           return vec3(0.0) + dot(vec3<f32>(hit.mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
         }
         }
+    }
+
+    return vec3<f32>(dir);
+}
+
+fn reflect_ray2(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    let hit: HDDAout = hdda_ray(src, dir);
+    let step: vec3<f32> = sign11(dir);
+
+    if hit.state == 0u {
+        let N = normalize(-step * vec3<f32>(hit.mask));
+
+        // Maybe do this only if material is reflective
+
+        let rdir = normalize(dir - 2.0 * N * dot(dir, N));
+        let rsrc = hit.p - 4e-2 * step * vec3<f32>(hit.mask);
+        let rcol = reflect_ray1(rsrc, rdir);
+        var mcol: vec3<f32>;
+        var I = s.sun_color.a * k_d * dot(-s.sun_dir, N);
+        // If angle is obtouse, that side is in shadow
+        I = max(0.0, I);
+
+        if I != 0.0  &&
+        hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir).state == 0u {
+            mcol = vec3(0.1) + I * s.sun_color.xyz * 0.05;
+        }
+        else {
+            mcol = vec3(0.1) + I * s.sun_color.xyz;
+        }
+
+        return mix(mcol, rcol, REFLECTIVITY);
+    }
+
+    if hit.state == 1u {
+        let N = normalize(-step * vec3<f32>(hit.mask));
+        let Np = max(vec3(0.0), N);
+        let Nn = -min(vec3(0.0), N);
+
+        return vec3<f32>(1.0, 0.0, 0.0) * Np.x +
+               vec3<f32>(0.0, 1.0, 0.0) * Np.y +
+               vec3<f32>(0.0, 0.0, 1.0) * Np.z +
+               vec3<f32>(1.0, 1.0, 0.0) * Nn.x +
+               vec3<f32>(0.0, 1.0, 1.0) * Nn.y +
+               vec3<f32>(1.0, 0.0, 1.0) * Nn.z;
+    }
+
+    return vec3<f32>(dir);
+}
+
+fn reflect_ray1(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    let hit: HDDAout = hdda_ray(src, dir);
+    let step: vec3<f32> = sign11(dir);
+
+    if hit.state == 0u {
+        let N = normalize(-step * vec3<f32>(hit.mask));
+        var I = s.sun_color.a * k_d * dot(-s.sun_dir, N);
+        // If angle is obtouse, that side is in shadow
+        I = max(0.0, I);
+
+        if I != 0.0  &&
+        hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir).state == 0u {
+            return vec3(0.1) + I * s.sun_color.xyz * 0.05;
+        }
+        return vec3(0.1) + I * s.sun_color.xyz;
+    }
+
+    if hit.state == 1u {
+        let N = normalize(-step * vec3<f32>(hit.mask));
+        let Np = max(vec3(0.0), N);
+        let Nn = -min(vec3(0.0), N);
+
+        return vec3<f32>(1.0, 0.0, 0.0) * Np.x +
+               vec3<f32>(0.0, 1.0, 0.0) * Np.y +
+               vec3<f32>(0.0, 0.0, 1.0) * Np.z +
+               vec3<f32>(1.0, 1.0, 0.0) * Nn.x +
+               vec3<f32>(0.0, 1.0, 1.0) * Nn.y +
+               vec3<f32>(1.0, 0.0, 1.0) * Nn.z;
     }
 
     return vec3<f32>(dir);
