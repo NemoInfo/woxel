@@ -146,7 +146,8 @@ struct HDDAout {
     i: u32,
 }
 
-const REFLECTIVITY: f32 = 0.3;
+const REFLECTIVITY: f32 = 0.7;
+const WALL_I: f32 = 0.1;
 fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let hit: HDDAout = hdda_ray(src, dir);
     let step: vec3<f32> = sign11(dir);
@@ -193,18 +194,8 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         case 4u: {
             let N = normalize(-step * vec3<f32>(hit.mask));
 
-            // Maybe do this only if material is reflective
-            // Rr = Ri - 2N(Ri*N)
-            let rdir = normalize(dir - 2.0 * N * dot(dir, N));
-
-            // Avoid self-intersection
-            let rsrc = hit.p - 4e-2 * step * vec3<f32>(hit.mask);
-
-            let rcol = reflect_ray2(rsrc, rdir);
-
             var mcol: vec3<f32>;
             var I = s.sun_color.a * k_d * dot(-s.sun_dir, N);
-            // If angle is obtouse, that side is in shadow
             I = max(0.0, I);
 
             if I != 0.0  &&
@@ -214,6 +205,19 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             else {
                 mcol = vec3(0.1) + I * s.sun_color.xyz;
             }
+
+            if hit.p.y > 0.0 {
+                return mcol;
+            }
+
+            // Rr = Ri - 2N(Ri*N)
+            let rdir = normalize(dir - 2.0 * N * dot(dir, N));
+
+            // Avoid self-intersection
+            let rsrc = hit.p - 4e-2 * step * vec3<f32>(hit.mask);
+
+            let rcol = reflect_ray2(rsrc, rdir);
+
 
             return mix(mcol, rcol, REFLECTIVITY);
         }
@@ -243,12 +247,12 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             let Np = max(vec3(0.0), N);
             let Nn = -min(vec3(0.0), N);
 
-            return vec3<f32>(1.0, 0.0, 0.0) * Np.x +
-                vec3<f32>(0.0, 1.0, 0.0) * Np.y +
-                vec3<f32>(0.0, 0.0, 1.0) * Np.z +
-                vec3<f32>(1.0, 1.0, 0.0) * Nn.x +
-                vec3<f32>(0.0, 1.0, 1.0) * Nn.y +
-                vec3<f32>(1.0, 0.0, 1.0) * Nn.z;
+            return vec3<f32>(WALL_I, 0.0, 0.0) * Np.x +
+                vec3<f32>(0.0, WALL_I, 0.0) * Np.y +
+                vec3<f32>(0.0, 0.0, WALL_I) * Np.z +
+                vec3<f32>(WALL_I, WALL_I, 0.0) * Nn.x +
+                vec3<f32>(0.0, WALL_I, WALL_I) * Nn.y +
+                vec3<f32>(WALL_I, 0.0, WALL_I) * Nn.z;
         }
         default: {
            return vec3(0.0) + dot(vec3<f32>(hit.mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
@@ -292,12 +296,12 @@ fn reflect_ray2(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         let Np = max(vec3(0.0), N);
         let Nn = -min(vec3(0.0), N);
 
-        return vec3<f32>(1.0, 0.0, 0.0) * Np.x +
-               vec3<f32>(0.0, 1.0, 0.0) * Np.y +
-               vec3<f32>(0.0, 0.0, 1.0) * Np.z +
-               vec3<f32>(1.0, 1.0, 0.0) * Nn.x +
-               vec3<f32>(0.0, 1.0, 1.0) * Nn.y +
-               vec3<f32>(1.0, 0.0, 1.0) * Nn.z;
+        return vec3<f32>(WALL_I, 0.0, 0.0) * Np.x +
+               vec3<f32>(0.0, WALL_I, 0.0) * Np.y +
+               vec3<f32>(0.0, 0.0, WALL_I) * Np.z +
+               vec3<f32>(WALL_I, WALL_I, 0.0) * Nn.x +
+               vec3<f32>(0.0, WALL_I, WALL_I) * Nn.y +
+               vec3<f32>(WALL_I, 0.0, WALL_I) * Nn.z;
     }
 
     return vec3<f32>(dir);
@@ -325,12 +329,12 @@ fn reflect_ray1(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         let Np = max(vec3(0.0), N);
         let Nn = -min(vec3(0.0), N);
 
-        return vec3<f32>(1.0, 0.0, 0.0) * Np.x +
-               vec3<f32>(0.0, 1.0, 0.0) * Np.y +
-               vec3<f32>(0.0, 0.0, 1.0) * Np.z +
-               vec3<f32>(1.0, 1.0, 0.0) * Nn.x +
-               vec3<f32>(0.0, 1.0, 1.0) * Nn.y +
-               vec3<f32>(1.0, 0.0, 1.0) * Nn.z;
+        return vec3<f32>(WALL_I, 0.0, 0.0) * Np.x +
+               vec3<f32>(0.0, WALL_I, 0.0) * Np.y +
+               vec3<f32>(0.0, 0.0, WALL_I) * Np.z +
+               vec3<f32>(WALL_I, WALL_I, 0.0) * Nn.x +
+               vec3<f32>(0.0, WALL_I, WALL_I) * Nn.y +
+               vec3<f32>(WALL_I, 0.0, WALL_I) * Nn.z;
     }
 
     return vec3<f32>(dir);
