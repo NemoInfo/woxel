@@ -1,0 +1,91 @@
+\begin{filecontents*}{\jobname.xmpdata}
+  \Title{Building a Ray-Tracing Engine on Sparse Voxel Grids}
+  \Author{10834225}
+  \Language{en-GB}
+  \Copyrighted{True}
+\end{filecontents*}
+
+\documentclass{extra}
+
+%%%%%%%%%%%%%%%%%% PACKAGES AND COMMANDS %%%%%%%%%%%%%%%%%%
+\usepackage{graphicx,psfrag,color} % for postscript graphics files
+  \graphicspath{ {./figures/} }
+\usepackage{amsmath}               % assumes amsmath package installed
+  \allowdisplaybreaks[1]           % allow eqnarrays to break across pages
+\usepackage{amssymb}               % assumes amsmath package installed
+\usepackage{url}                   % format hyperlinks correctly
+\usepackage{rotating}              % allow portrait figures and tables
+\usepackage{multirow}              % allows merging of rows in tables
+\usepackage{lscape}                % allows pages to be typeset in landscape mode
+\usepackage{tabularx}              % allows fixed width tables
+\usepackage{verbatim}              % enhanced version of built-in verbatim environment
+\usepackage{footnote}              % allows more control over footnote environments
+\usepackage{float}                 % allows H option on floats to force here placement
+\usepackage{booktabs}              % improve table line spacing
+\usepackage{lipsum}                % for adding dummy text here
+\usepackage[base]{babel}           % for proper hypthenation in lipsum sections
+\usepackage{subcaption}            % for multiple sub-figures in a single float
+\usepackage{cleveref}
+\newtheorem{theorem}{Theorem}
+
+\newcommand{\degree}{\ensuremath{^\circ}}
+\newcommand{\sus}[1]{$^{\mbox{\scriptsize #1}}$} % superscript in text (e.g. 1st)
+\newcommand{\sub}[1]{$_{\mbox{\scriptsize #1}}$} % subscript in text
+
+%%%%%%%%%%%%%%%%%% REFERENCES SETUP %%%%%%%%%%%%%%%%%%
+\usepackage[style=ieee,backend=biber,backref=true,hyperref=auto,backend=bibtex]{biblatex}
+% \DefineBibliographyStrings{english}{backrefpage = {cited on p\adddot},  backrefpages = {cited on pp\adddot}}
+\addbibresource{ref.bib}
+
+%%%%%%%%%%%%%%%%%% START DOCUMENT %%%%%%%%%%%%%%%%%%
+\begin{document}
+\makeatletter
+\title{\xmp@Title}
+\studentid{\xmp@Author}
+\makeatother
+
+\course{Computer Science}
+\submitdate{2024}
+\wordcount{many}
+\maketitle
+
+
+
+%%%%%%%%%%%%%%%%%% LISTS OF CONTENT %%%%%%%%%%%%%%%%%%
+\uomtoc
+% other lists are not required, but can include \uomlof and \uomlot if really want to
+
+
+%%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
+\begin{abstract} % put abstract here. Limit is 1 page.
+  This is abstract text.
+
+  \lipsum[1-2]
+\end{abstract}%
+\clearpage
+
+
+%%%%%%%%%%%%%%%%%% DECLARATIONS %%%%%%%%%%%%%%%%%%
+\uomdeclarations % Don't need unless final thesis
+
+
+\begin{uomacknowledgements}
+What should I aknowledge?! I am citing \cite{this}, and \cite{that}
+\end{uomacknowledgements}
+
+%%%%%%%%%%%%%%%%%% CONTENT %%%%%%%%%%%%%%%%%%
+\include{chapters/intro.tex}
+
+%%%%%%%%%%%%%%%%%% REFERRENCES %%%%%%%%%%%%%%%%%%
+\printbibliography[title={References},heading=bibintoc]
+
+%%%%%%%%%%%%%%%%%% APPENDICES %%%%%%%%%%%%%%%%%%
+\begin{uomappendix}
+    \section{Project outline}
+    Project outline as submitted at the start of the project is a required appendix.
+
+    \section{Risk assessment}
+    Risk assessment is a required appendix. Put here. And there as well
+\end{uomappendix}
+
+\end{document}
