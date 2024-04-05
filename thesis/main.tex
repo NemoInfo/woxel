@@ -26,8 +26,10 @@
 \usepackage[base]{babel}           % for proper hypthenation in lipsum sections
 \usepackage{subcaption}            % for multiple sub-figures in a single float
 \usepackage{cleveref}
-\newtheorem{theorem}{Theorem}
+\usepackage{xcolor}
+\usepackage[inkscapelatex=false]{svg}
 
+\newtheorem{theorem}{Theorem}
 \newcommand{\degree}{\ensuremath{^\circ}}
 \newcommand{\sus}[1]{$^{\mbox{\scriptsize #1}}$} % superscript in text (e.g. 1st)
 \newcommand{\sub}[1]{$_{\mbox{\scriptsize #1}}$} % subscript in text
@@ -70,11 +72,12 @@
 
 
 \begin{uomacknowledgements}
-What should I aknowledge?! I am citing \cite{this}, and \cite{that}
+What should I aknowledge?! I am citing \cite{this}, and \cite{that} hell
 \end{uomacknowledgements}
 
 %%%%%%%%%%%%%%%%%% CONTENT %%%%%%%%%%%%%%%%%%
 \include{chapters/intro.tex}
+\include{chapters/background.tex}
 
 %%%%%%%%%%%%%%%%%% REFERRENCES %%%%%%%%%%%%%%%%%%
 \printbibliography[title={References},heading=bibintoc]
