@@ -18,3 +18,63 @@
    Pages = {2816-2825},
    Year = 2009
 }
+
+@article{vdb2013,
+author = {Museth, Ken},
+title = {VDB: High-resolution sparse volumes with dynamic topology},
+year = {2013},
+issue_date = {June 2013},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {32},
+number = {3},
+issn = {0730-0301},
+url = {https://doi.org/10.1145/2487228.2487235},
+doi = {10.1145/2487228.2487235},
+abstract = {We have developed a novel hierarchical data structure for the efficient representation of sparse, time-varying volumetric data discretized on a 3D grid. Our “VDB”, so named because it is a Volumetric, Dynamic grid that shares several characteristics with B+trees, exploits spatial coherency of time-varying data to separately and compactly encode data values and grid topology. VDB models a virtually infinite 3D index space that allows for cache-coherent and fast data access into sparse volumes of high resolution. It imposes no topology restrictions on the sparsity of the volumetric data, and it supports fast (average O(1)) random access patterns when the data are inserted, retrieved, or deleted. This is in contrast to most existing sparse volumetric data structures, which assume either static or manifold topology and require specific data access patterns to compensate for slow random access. Since the VDB data structure is fundamentally hierarchical, it also facilitates adaptive grid sampling, and the inherent acceleration structure leads to fast algorithms that are well-suited for simulations. As such, VDB has proven useful for several applications that call for large, sparse, animated volumes, for example, level set dynamics and cloud modeling. In this article, we showcase some of these algorithms and compare VDB with existing, state-of-the-art data structures.},
+journal = {ACM Trans. Graph.},
+month = {jul},
+articleno = {27},
+numpages = {22},
+keywords = {Volumes, fluid animation, implicit surfaces, level sets}
+}
+
+@inproceedings{vdb2014,
+author = {Museth, Ken},
+title = {Hierarchical digital differential analyzer for efficient ray-marching in OpenVDB},
+year = {2014},
+isbn = {9781450329606},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/2614106.2614136},
+doi = {10.1145/2614106.2614136},
+booktitle = {ACM SIGGRAPH 2014 Talks},
+articleno = {40},
+numpages = {1},
+location = {Vancouver, Canada},
+series = {SIGGRAPH '14}
+}
+
+@book{rustbook,
+author = {Klabnik, Steve and Nichols, Carol},
+title = {The Rust Programming Language},
+year = {2018},
+isbn = {1593278284},
+publisher = {No Starch Press},
+address = {USA},
+abstract = {The Rust Programming Language is the official book on Rust, an open-source, community-developed systems programming language that runs blazingly fast, prevents segfaults, and guarantees thread safety. This is the undisputed go-to guide to Rust, written by two members of the Rust core team, with feedback and contributions from 42 members of the community. The book assumes that youve written code in another programming language but makes no assumptions about which one, meaning the material is accessible and useful to developers from a wide variety of programming backgrounds. Known by the Rust community as The Book, The Rust Programming Language includes concept chapters, where youll learn about a particular aspect of Rust, and project chapters, where youll apply what youve learned so far to build small programs. The Book opens with a quick hands-on project to introduce the basics then explores key concepts in depth, such as ownership, the type system, error handling, and fearless concurrency. Next come detailed explanations of Rust-oriented perspectives on topics like pattern matching, iterators, and smart pointers, with concrete examples and exercises--taking you from theory to practice. The Rust Programming Language will also show you how to:- Grasp important concepts unique to Rust, like ownership, borrowing, and lifetimes- Use Cargo, Rusts built-in package manager, to build and maintain your code, including downloading and building dependencies- Effectively use Rusts zero-cost abstractions and employ your own Youll learn to develop reliable code thats speed and memory efficient, while avoiding the infamous and arcane programming pitfalls common at the systems level. When you need to dive down into lower-level control, this guide will show you how without taking on the customary risk of crashes or security holes and without requiring you to learn the fine points of a fickle toolchain. Youll also learn how to create command line programs, build single- and multithreaded web servers, and much more. The Rust Programming Language fully embraces Rusts potential to empower its users. This friendly and approachable guide will help you build not only your knowledge of Rust but also your ability to program with confidence in a wider variety of domains.}
+}
+
+@manual{webgpu:doc,
+  title = {WebGPU},
+  organization = {World Wide Web Consortium (W3C)},
+  year = {2023},
+  url = {https://www.w3.org/TR/webgpu/},
+}
+
+@misc{wgpu,
+  author = {{wgpu Project}},
+  title = {wgpu: Rust Graphics API},
+  year = {2023},
+  url = {https://wgpu.rs/},
+}
