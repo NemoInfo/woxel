@@ -84,7 +84,7 @@ The \verb|Window| data structure, included in the \textbf{winit}\supercite{winit
 
 The interaction between the \verb|Window| and the \verb|Runtime| forms an event-driven workflow. The window emmits events and the runtime manages and distributes these events accordingly, forming a sort of feedback loop.
 
-\subsubsection{Scene}
+\subsubsection{Scene}\label{scene:def}
 The \verb|Scene| data structe holds information about the enviorment that is being rendered, this includes the model, camera, and engine state.
 
 \begin{lstlisting}[language=rust,caption={Scene definition},captionpos=b]
@@ -97,7 +97,7 @@ pub struct Scene {
 
 In this section, the camera and satte implementation is covered, the model will be covered in later [add link] when discussing the \acrshort{vdb} implementation.
 \newacronym{fps}{FPS}{Frames per second}
-\newacronym{fov}{FOV}{Field of view}
+\newacronym{fov}{FOV}{Field of view, explained in \cref{scene:def}, \cref{fov:def}}
 
 \paragraph{State} handles information about the engine state such as cursor state and time synchronising to decouple engine events from the \acrshort{fps} (e.g. camera movement shouldn't be slower at lower FPS).
 
@@ -105,7 +105,7 @@ In this section, the camera and satte implementation is covered, the model will 
 \begin{enumerate}
     \item \emph{Eye:} The camera's position in the 3D space, acting as the point from which the scene is observed.
     \item \emph{Target:} The point in space the camera is looking at, determining the direction the camera is pointed in.
-    \item \emph{Field of View (FOV):} An angle representing the range that is in view. In the implementation, this refers to the FOV on the $Y$ (vertical) axis.
+    \item \emph{Field of View (FOV):} An angle representing the range that is in view. In the implementation, this refers to the FOV on the $Y$ (vertical) axis.\label{fov:def}
     \item \emph{Aspect ratio:} The ratio between the width and height of the viewport. It esnures that the rendered scene maintains the correct proportions.
 \end{enumerate}
 The eye and target are updated when moving the camera through a \verb|CameraController| struct that handles keyboard and mouse input. Th FOV and aspect ratio are set based on the window proportions, to avoid distortion. The way in which this camera information is used will be detailed in the primitives section [add link] where we dive into what information is actually sent to the GPU in compute shaders.
@@ -155,18 +155,157 @@ This section covers the \verb|FrameDescriptor| data structe and how it generates
 Virtually the entire ray-tracing algorithm is run in compute shaders. This means all the information about the model, camera, lights, and metadata has to be passed through.
 
 The statically sized data i.e. the camera, sunlight and metadata is passed in an uniform buffer. This buffer is assembled inside the \verb|FrameDescriptor| which wraps \verb|ComputeState|.
-This is a data structure that converts bla bla.
-Matrix Conversion: The camera's view projection matrix and the transformation from camera to world coordinates are flattened into 4x4 f32 arrays.
-Camera Position and Orientation: The camera's position (eye) and orientation vectors (u, -v, and w') are represented as arrays, facilitating the calculation of ray directions within the compute shader.
-Rendering Parameters: Additional fields such as render\_mode, show\_345 (a flag array for toggling voxel boundary highlighting), sun\_dir, and sun\_color (with the alpha channel representing intensity) are included to control various aspects of the rendering process, from the mode of rendering to the simulation of lighting conditions.
 
+\begin{lstlisting}[language=Rust]
+#[repr(C)]
+pub struct ComputeState {
+  view_projection: [[f32; 4]; 4],
+  camera_to_world: [[f32; 4]; 4],
+  eye: [f32; 4],
+  u: [f32; 4],
+  mv: [f32; 4],
+  wp: [f32; 4],
+  render_mode: [u32; 4],
+  show_345: [u32; 4],
+  sun_dir: [f32; 4],
+  sun_color: [f32; 4],
+}
+\end{lstlisting}
 
+The GPU's uniform binding system has strict requirements regarding the types and sizes of data that can be passed to shaders. Therfore, information must be packed into memory-aligned bytes. This is facilitated by the #[repr(C)] attribute, which organizes the struct's layout to match that of a C struct. The data also needs to be padded to fit the aligment options, for that reason all fields are 16 bytes, even if they carry less information.
+
+\begin{lstlisting}[language=rust,caption={\texttt{ComputeState} build method that transforms CPU data into GPU-ready data},captionpos=b,
+  label={cstate:build}]
+impl ComputeState {
+  ...
+  pub fn build(
+    c: &Camera,
+    resolution_width: f32,
+    render_mode: RenderMode,
+    show_grid: [bool; 3],
+    sun_dir3: [f32; 3],
+    sun_color3: [f32; 3],
+    sun_intensity: f32,
+    ) -> Self;
+}
+\end{lstlisting}
+
+The role of \verb|ComputeState| is to translate high level CPU structures onto these low level GPU types. In future sections the function of the structures fields will be detailed thoroughly.
 
 \subsubsection{Camera}
 
-\subsubsection{Shaders}
-\includegraphics[width=1.0\linewidth]{compute_shaders}
+This section explains how the 3D ray-casting camera is implemented. To role of a camera in a ray-tracing engine is to cast rays from the eye of the camera through the middle of the pixels and into the scene.
 
-\subsubsection{Utilities}
+Fundamentally the role of the camera is to convert points from world space into screen space. To that end, a view projection matrix can be constructed from the cameras properties (eye, target, \acrshort{fov}, aspect ratio) that takes any point in world space and projects it onto camera space.
+
+In order to cast a ray in world space from the eye of the camera through the middle of the pixel and into the scene we need to bring the pixel from screen space into world space. This is the inverse operation to projection, and hence the inverse matrix of the projection matrix is the camera-to-world matrix.
+
+
+\begin{align}
+  \bm{d_{s}} = \begin{bmatrix}
+              x - \frac{\rm{width}}{2} \\
+              \frac{\rm{height}}{2} - y \\
+              -\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}} \\
+            \end{bmatrix},
+  \ \rm{C2W} = \begin{bmatrix}
+                  u_{x} & v_{x} & w_{x} \\
+                  u_{y} & v_{y} & w_{y} \\
+                  u_{z} & v_{z} & w_{z} \\
+                \end{bmatrix}
+\end{align}
+\begin{align}
+\intertext{Multypling gives the pixel coordinates in world space}
+  \bm{d_{w}} =
+      \begin{bmatrix}
+        x - \frac{\rm{width}}{2} \\
+        \frac{\rm{height}}{2} - y \\
+        -\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}} \\
+      \end{bmatrix}
+      \begin{bmatrix}
+         u_{x} & v_{x} & w_{x} \\
+         u_{y} & v_{y} & w_{y} \\
+         u_{z} & v_{z} & w_{z} \\
+      \end{bmatrix}
+         &=
+      \begin{bmatrix}
+        (x - \frac{\rm{width}}{2})u_{x} + (\frac{\rm{height}}{2} - y)v_{x} - w_{x}\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}} \\
+        (x - \frac{\rm{width}}{2})u_{y} + (\frac{\rm{height}}{2} - y)v_{y} - w_{y}\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}} \\
+        (x - \frac{\rm{width}}{2})u_{z} + (\frac{\rm{height}}{2} - y)v_{z} - w_{z}\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}}
+      \end{bmatrix}
+\intertext{Which can be re-written by factoring constant terms into $\bm{w'}$:}
+  \bm{d_{s}} &= x\bm{u} + y*(-\bm{v}) + \bm{w'} \\
+  \bm{w'} &= -\bm{u}\frac{\rm{width}}{2} + \bm{v}\frac{\rm{height}}{2} - \bm{w}\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}}
+\end{align}
+
+This form of the ray direction equation is very useful since the vectors $\bm{u}, \bm{v}$ and $\bm{w'}$ can all be computed once per frame, then the equation is applied in compute shaders per pixel. This method is explained in more detail in this article\supercite{camera_rays}.
+
+\crefformat{lstlisting}{lst. #2#1#3}
+\Crefformat{lstlisting}{Lst. #2#1#3}
+
+In the implementation, the calculation of these constant vectors is the responsibility of the \verb|ComputeState| data structure; the \verb|build| method (\cref{cstate:build}) takes in a \verb|Camera| specified by its eye, target, \acrshort{fov} and aspect ratio, and computes the view projection matrix, inverts it to get the camera to world matrix, extracts $\bm{u}, \bm{v}$ and $\bm{w}$, then uses the screen's resolution to calculate $\bm{w'}$. It then packs these vectors into 16 byte arrays.
+
+\subsubsection{Shaders}
+In this section the role of the three shader stages in the implementation is explained.
+
+\begin{multicols}{2}
+  \paragraph{Compute Shaders} are the first in the pipeline. They are responsible for performing the entire ray-tracing algorihtm. The Compute shader distributes computational power to work groups, which can be thought as independent units of execution that handle different parts of the calculation in parallel.
+  Each work group is made up of multiple threads that can execute concurrently, significantly speeding up the process by allowing multiple computations to occur at the same time.
+  The Compute Shader casts rays from the camera eye through the pixels, intersections with the model determine to a pixels's color based on material properties, and record these results on a 2D texture.
+
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=1.2\linewidth]{compute_shaders}
+    \caption{Compute shader worker casting a camera ray through a pixel. Work groups of size $8\times4\times1$ have split up the screen.}
+  \end{figure}
+\end{multicols}
+\paragraph{Vertex Shaders} follow Compute Shaders in the graphics pipeline. Their main role is to define the vertices of a screen-sized rectangle, which serves as the canvas for overlaying the texture computed in the Compute Shader stage.
+\paragraph{Fragment Shaders} are the last shaders in the pipeline. The Fragment Shaders' role is to rasterize the texture onto the full-screen rectangle prepared by the Vertex Shader. This step effectively transfers the texture onto the display window.
+\begin{multicols}{2}
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{vertex_shaders}
+    \caption{Vertex shader creating the output surface}
+  \end{figure}
+
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.81\linewidth]{fragment_shaders}
+    \caption{Fragment shader rasterizing the compute shader texture onto the output surface}
+  \end{figure}
+\end{multicols}
+
+\subsubsection{GUI}
+\newacronym{gui}{GUI}{Graphical User Interface}
+
+This section covers the implementation of the \acrshort{gui} that allows the scene to active model to be changed, lighting to be modified, but also provides usefull developer metrics like ms/frame and other benchmarks.
+
+The GUI is managed using the \verb|egui| crate\supercite{egui:doc}.
+\verb|egui| is an immediate\supercite{im_gui} mode GUI library, which contrasts with traditional retained mode GUI frameworks\supercite{im_vs_rt}.
+
+In immediate mode, GUI elements are redrawn every frame and only exist while the code that declares them is running. This approach makes \verb|egui| flexible and responsive, as it allows for quick updates and changes without needing to manage a complex state or object hierarchy.
+
+The GUI code is run as part of the graphics pipeline in the following steps:
+\begin{enumerate}
+\item \emph{Start Frame:} Each frame begins with a start-up phase where \verb|egui| prepares to receive the definition of the GUI elements. This setup includes handling events from the previous frame, resetting state as necessary, and preparing to collect new user inputs.
+
+\item \emph{Define GUI Elements:} The application defines its GUI elements by calling functions on an \verb|egui| context object. These functions create widgets such as buttons, sliders, and text fields dynamically, based on the current state and user interactions. This step is where the immediate mode shines, as changes to the GUI's state are made directly in response to user actions, without requiring a separate update phase.
+
+\item \emph{End Frame:} After all GUI elements are defined, the frame ends with \verb|egui| rendering all the GUI components onto the screen. During this phase, \verb|egui| computes the final positions and appearances of all elements based on interactions and the layout rules provided.
+
+\item \emph{Integration with Graphics Pipeline:} The GUI is overlaid on the application using a texture that \verb|egui| outputs. This texture is then drawn over the application window using a simple full-screen quad as in the previous section.
+\end{enumerate}
+
+[maybe add screen shot?]
+\subsubsection{Recording}
+
+The engine includes an integrated screen recorder designed to efficiently capture screen footage without compromising the frame rate. Unlike external tools such as OBS, which must capture screen output externally and can be slow due to their inability to access application internals, this engine captures the output texture directly before it is displayed on the screen. This method significantly reduces the time required for capture, giving smoother results, and keeping the frame rate high.
+
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.5\linewidth]{recording}
+  \caption{Producer-Consumer pattern of screen recording implementation}
+\end{figure}
+
+The key aspect of this process is to ensure that texture transfer and video encoding are handled asynchronously on a separate thread. This is done using a Producer-Consumer pattern, where the main thread acts as the producer. It periodically places frames into a blocking queue. From this queue, an encoding thread, acting as the consumer, retrieves and processes the frames. This includes encoding the frames into PNG format and subsequently feeding them into \verb|ffmpeg|, a video encoding utility. This approach ensures background processing, minimizing the impact on the engine's performance.
 
 \subsection{VDB Implementation}
