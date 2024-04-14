@@ -1,0 +1,133 @@
+\subsection{VDB Implementation}
+
+In this section the theory and implementation the VDB data structure is covered.
+
+
+The VDB (Volumetric Dynamic B-tree) is an advanced data structure designed for efficient and flexible representation of sparse volumetric data. It is organized hierarchically, consisting of root nodes, internal nodes, and leaf nodes, each serving distinct purposes within the structure. This section begins by explaining in detail how VDB is structured, and it continues by going though the implementation of the data structure in the rendering engine.
+
+\subsubsection{Data Structure}
+VDBs are sparse, shallow trees with a fixed depth but expandable breadth, capable of covering an virutally infinite spatial domain. This design enables the VDB to efficiently manage large and complex datasets by adjusting the level of detail dynamically and minimizing memory usage.
+
+
+At the hear of the data structure are its three types of nodes, internal root and leaf. The VDB data structure is inherently general, each of the nodes' sizes can be modefied depending on the application. However, in practice only one specialization of the VDB structure is used, that is the VDB345. This is because the authors of the original paper\supercite{vdb2013} analyized a suite of possible shapes and sizes, and this configuration of VDB the most balanced between performance and memory footprint for most practical applications [TODO: what applications?]
+
+\paragraph{Leaf Nodes} They are the lowest level in the tree structure. They store a 3D cubed grid of side length $2^{\log_{2} D}$ (i.e. only powers of 2). An leaf value in the grid can be a voxel's data, other associated data for empty values (such as SDF information), or an empty value.
+Leaf nodes also store a value mask. This is a bit-array meant to compactly determine if value at a specific coordinate in the 3D grid is voxel data or an empty value.
+
+In the implementation the trait \verb|Node| is defined which gives some associated data and methods leaf and internal nodes have.
+
+\begin{lstlisting}[language=rust,caption={\texttt{Node} trait definition},captionpos=b,label={code:node}]
+pub trait Node {
+    /// LOG2_D of side length
+    /// LOG2_D = 3 => `512 = 8 * 8 * 8` values
+    const LOG2_D: u64;
+    /// Total conceptual LOG2_D node
+    const TOTAL_LOG2_D: u64;
+    /// Total conceptual LOG2_D of child node
+    const CHILD_TOTAL_LOG2_D: u64 = Self::TOTAL_LOG2_D - Self::LOG2_D;
+    /// Side length
+    const DIM: u64 = 1 << Self::LOG2_D;
+    /// Total conceptual dimension
+    const TOTAL_DIM: u64 = 1 << Self::TOTAL_LOG2_D;
+    /// Size of this node (i.e. length of data array)
+    const SIZE: usize = 1 << (Self::LOG2_D * 3);
+    /// Total conceptual size of node, including child size
+    const TOTAL_SIZE: u64 = 1 << (Self::TOTAL_LOG2_D * 3);
+}
+\end{lstlisting}
+
+In \cref{code:node}, \verb|TOTAL_LOG2_D| represents the $\log_{2}$ of the total dimension of the node, meaning how much actual space the node occupies. Leaf nodes are at the bottom of the tree and don't have children so this is the same as $\log_{2} D$, but this value will be relevant for internal nodes. All other attributes are determined at compile-time depending on the size of the node $\log_{2} D$.
+
+\begin{quote}
+  \paragraph{Sidenote on Coordinate Systems}
+
+  It is very convenient for side lengths to be powers of two because of the way integers are stored in memory, as binary values. To get the global coordinate of a node with \verb|TOTAL_LOG2_D| $= 3$ that contains a point in global coordinates, the 3 least signifcant bits of each coordinate have to be masked out. This can essentially be done in a single CPU instruction for each coordinate.
+
+\begin{lstlisting}[language=rust]
+/// Give global origin of Node coordinates from `global` point
+fn global_to_node(global: GlobalCoordinates) -> GlobalCoordinates {
+    global.map(|c| (c >> Self::TOTAL_LOG2_D) << Self::TOTAL_LOG2_D)
+}
+\end{lstlisting}
+
+Simillary, to get the relative coordinates of a global point within the node are precisely the \texttt{TOTAL\_LOG2\_D} least siginificant bits.
+
+\begin{lstlisting}[language=rust]
+/// Give local coordinates relative to the Node containing `global` position
+fn global_to_relative(global: GlobalCoordinates) -> LocalCoordinates {
+    global.map(|c| (c & ((1 << Self::TOTAL_LOG2_D) - 1)))
+}
+\end{lstlisting}
+
+This pattern of a few bit-wise operations can acheive any conversion from between coordinate systems one might need, and all of these through operations are extremly fast to compute on modern CPUs.
+\end{quote}
+
+\Cref{code:leaf} shows a simplified definition of the leaf node data structure in the implementation. It has two fields: data which is an array representing the 3D cube grid of values, and value mask which is a the bit-mask carrying information on what each value represnts, a voxel or empty space. the data array has has $2^{3\log_{2} D}$ entries(e.g. for $\log_{2} D = 3 \Rightarrow D = 8$ the leaf node has $8\times8\times8 = 512 = 2^{9}$ values). The value mask has the same number of bit entries, but it is stored as an array of unsined 64 bit integers, hence there are $\frac{D^{3}}{64}$ of them.
+
+\begin{lstlisting}[language=rust, captionpos=b, caption={\texttt{LeafNode} definition},label={code:leaf}]
+pub struct LeafNode<ValueType, const LOG2_D: u64>
+{
+    pub data: [LeafData<ValueType>; (1 << (LOG2_D * 3))],
+    pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64)],
+}
+
+pub enum LeafData<ValueType> {
+    Tile(usize),
+    Value(ValueType),
+}
+
+impl<ValueType, const LOG2_D: u64> Node for LeafNode<ValueType, LOG2_D>
+{
+    const LOG2_D: u64 = LOG2_D;
+    const TOTAL_LOG2_D: u64 = LOG2_D;
+}
+\end{lstlisting}
+
+The \verb|LeafData| enum is used as a data field for the leaf such that the type of the value can be infered without polling the value mask, this was done strictly for code \emph{ergonomics}, the value mask will still be curcial because shading languages do not have enum support, and because value masks enable quick add operations between 2 VDBs.
+
+The last part of \cref{code:leaf} shows how the \verb|Node| trait is implemented by \verb|LeafData|, because these nodes are the bottom level in the hierarchy (so they have no children) their in-memory dimensions are the same as their world space dimensions.
+
+The implenetation is general both in the type of value that is stored at the voxel level, \verb|ValueType|, and in the dimension of the Node, \verb|LOG2_D|. This makes use of Rust's generic const expresions feature \supercite{rust:generic} that is only available on the nightly toolchain. These work in a way akin to C++ templates allowing to define types of static size chosen by the user of the data structure that are resolved at compile time. This approach effectively allows to costumize the tree breadth and depth at compile time with no run-time overhead.
+
+\paragraph{Internal Nodes} They sit between the root node and the leaf nodes, forming the middle layer of the tree structure.
+They also store a 3D cubed grid of side length $2^{D}$ of values. An internal value can either be a pointer to a child node (leaf or internal), or a tile value, which is a value that is the same for the whole space that would be covered by a child node in that position.
+Internal nodes also store a value mask and child mask. These determine if value at a specific coordinate in the 3D grid is child pointer, value type or empty value.
+
+
+\begin{lstlisting}[language=rust, captionpos=b, caption={\texttt{InternalNode} definition},label={code:intern}]
+pub struct InternalNode<ValueType, ChildType, const LOG2_D: u64>
+where
+    ChildType: Node,
+{
+    pub data: [InternalData<ChildType>; (1 << (LOG2_D * 3))],
+    pub value_mask: [u64; ((1 << (LOG2_D * 3)) / 64)],
+    pub child_mask: [u64; ((1 << (LOG2_D * 3)) / 64)],
+}
+
+
+pub enum InternalData<ChildType> {
+    Node(Box<ChildType>),
+    Tile(usize),
+}
+
+
+impl<ValueType, ChildType, const LOG2_D: u64> Node
+    for InternalNode<ValueType, ChildType, LOG2_D>
+where
+    ChildType: Node,
+{
+    const LOG2_D: u64 = LOG2_D;
+    const TOTAL_LOG2_D: u64 = LOG2_D + ChildType::TOTAL_LOG2_D;
+}
+\end{lstlisting}
+
+In \cref{code:intern}, that internal nodes have an extra field in the child mask that is the same size of the value mask. Aditionally the internal data enum now has variants for a child pointer or 4 bytes of memory. When implemening the \verb|Node| the \verb|TOTAL_LOG2_D| is calculated by adding this nodes $\log_{2}D$ with the child node's total $\log_{2}D$. For example, for an internal node with $log_{2}D = 4$ with children that are leaf nodes of $log_{2}D_{c} = 3$, the internal node's total $\log_{2}D$ will be $7$. This means that the internal node has $16\times16\times16$  children that each have $8\times8\times\8$ voxels; the total number of voxels one of these internal nodes is $128\times128\times128$.
+
+It is imporant to note that all children of an internal node must be of the same type that means each level in the tree only has one type of node, this ensure consistency in the coordinate system discussed previously.
+
+\paragraph{Root Node} There is only one root node, it sits at the top of the VDB hierarchy. Unlike typical nodes in a tree data structure, the root node in a VDB does not store data directly but instead serves as an entry point to the tree.
+It contains a hash map indexed by global coordinates, linking to all its child nodes. This setup allows for quick access and updates, as the root node acts as a guide to more detailed data stored deeper in the hierarchy. Because its children nodes are stored by a hash map, it only stores information about space that has information to be stored(unlinke an octree where empty top level nodes are frequent). The root node's primary role is to organize and provide access to internal nodes.
+
+\subsubsection{Reading \texttt{.vdb}}
+\subsubsection{Computing SDF}
+\subsubsection{GPU VDB}
