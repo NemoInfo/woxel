@@ -5,6 +5,8 @@ In this section the theory and implementation the VDB data structure is covered.
 The VDB (Volumetric Dynamic B-tree) is an advanced data structure designed for efficient and flexible representation of sparse volumetric data. It is organized hierarchically, consisting of root nodes, internal nodes, and leaf nodes, each serving distinct purposes within the structure. This section begins by explaining in detail how VDB is structured, and it continues by going though the implementation of the data structure in the rendering engine.
 
 \subsubsection{Data Structure}
+\label{vdb:ds}
+
 VDBs are sparse, shallow trees with a fixed depth but expandable breadth, capable of covering an virutally infinite spatial domain. This design enables the VDB to efficiently manage large and complex datasets by adjusting the level of detail dynamically and minimizing memory usage.
 
 \begin{figure}[H]
@@ -13,7 +15,7 @@ VDBs are sparse, shallow trees with a fixed depth but expandable breadth, capabl
   \caption{2D \& 1D slices of the VDB data structure representing three quarters of a circle. Top left: 2D dense representation of the circle. Top right: 2D sparse representation of the VDB. Bottom left: Sparse representation of the 1D vdb. Usually, VDB nodes have many more child nodes, which whould make it harder to visualise, hence a smaller version of VDB is shown. This figure is an augumented version of the one in the original paper\supercite{vdb2013}}
 \end{figure}
 
-At the hear of the data structure are its three types of nodes, internal root and leaf. The VDB data structure is inherently general, each of the nodes' sizes can be modefied depending on the application. However, in practice only one specialization of the VDB structure is used, that is the VDB345. This is because the authors of the original paper\supercite{vdb2013} analyized a suite of possible shapes and sizes, and this configuration of VDB the most balanced between performance and memory footprint for most practical applications [TODO: what applications?]
+At the hear of the data structure are its three types of nodes, internal root and leaf. The VDB data structure is inherently general, each of the nodes' sizes can be modefied depending on the application. However, in practice only one specialization of the VDB structure is used, that is the VDB543. This is because the authors of the original paper\supercite{vdb2013} analyized a suite of possible shapes and sizes, and this configuration of VDB the most balanced between performance and memory footprint for most practical applications [TODO: what applications?]
 
 \paragraph{Leaf Nodes} They are the lowest level in the tree structure. They store a 3D cubed grid of side length $2^{\log_{2} D}$ (i.e. only powers of 2). An leaf value in the grid can be a voxel's data, other associated data for empty values (such as SDF information), or an empty value.
 Leaf nodes also store a value mask. This is a bit-array meant to compactly determine if value at a specific coordinate in the 3D grid is voxel data or an empty value.
@@ -74,7 +76,7 @@ This pattern of a few bit-wise operations can acheive any conversion from betwee
     In this implementation a enum is used strictly for \emph{ergonomics}, as the extra 1 byte of memory per value is generally not expensive on heap allocated memory.
     The value mask will still be curcial for the GPU version of VDB where there is more need for effective memory management and shading languages do not have enum support.
     In the \texttt{Node} trait implementation, since these nodes are the bottom level in the hierarchy (meaning they have no children), their in-memory dimensions are the same as their world space dimensions.
-  }, label{code:leaf}]
+  }, label={code:leaf}]
 pub struct LeafNode<ValueType, const LOG2_D: u64>
 {
     pub data: [LeafData<ValueType>; (1 << (LOG2_D * 3))],
@@ -149,7 +151,7 @@ pub enum RootData<ChildType> {
 
 Finally, a VDB simply consits of a root node and some metadata associated with the volume, stored in the \verb|grid_descriptor| feild. This metadata is generally only imprtant when reading enad writing \verb|.vdb| files.
 
-\begin{lstlisting}[language=rust, captionpos=b, caption={\texttt{VDB} definition}]
+\begin{lstlisting}[language=rust, captionpos=b, caption={\texttt{VDB} definition}, label={vdb:def}]
 pub struct VDB<ValueType, ChildType: Node>
 {
     pub root: RootNode<ValueType, ChildType>,
@@ -157,19 +159,19 @@ pub struct VDB<ValueType, ChildType: Node>
 }
 \end{lstlisting}
 
-\subsubsection{VDB345}
-$\rm{VDB}345$ is the most widely used configuration of the VDB data structure, because gives a good balance of performance and memory footprint for most applications.
+\subsubsection{VDB543}
+$\rm{VDB}543$ is the most widely used configuration of the VDB data structure, because gives a good balance of performance and memory footprint for most applications.
 \begin{sloppypar}
-  To refer to different shapes of the VDB data structure, by convention, they are named as ${\rm{VDB}[a_{0},a_{1},\dots, a_{n}]}$, meaning it has a  bottom layer of leaf nodes with $\log_{2}D_{0}=a_{0}$ follwed by $n$ layers of internal nodes with $\log_{2}D_{i}=a_{i}$. $\rm{VDB}345$ therfore with leaf nodes with $\log_{2}D_{n3} = 3$ and two layers of internal nodes, one with $\log_{2}D_{n4} = 4$ and the other with $\log_{2}D_{n5} = 5$.
+  To refer to different shapes of the VDB data structure, by convention, they are named as ${\rm{VDB}[a_{0},a_{1},\dots, a_{n}]}$, $n$ layers of internal nodes with $\log_{2}D_{i}=a_{i}$ followed by a layer of leaf nodes with $\log_{2}D_{n}=a_{n}$. $\rm{VDB}543$ therefore has a layer of leaf nodes with $\log_{2}D_{n3} = 3$ and two layers of internal nodes, one with $\log_{2}D_{n4} = 4$ and the other with $\log_{2}D_{n5} = 5$.
 \end{sloppypar}
 
-To implement this type of VDB new type name for each type of node is created as show in \cref{vdb345}, chaining them up the tree. This section will refer to these nodes as \texttt{Node3}s, \texttt{Node4}s and \texttt{Node5}s respectively.
+To implement this type of VDB new type name for each type of node is created as show in \cref{vdb543}, chaining them up the tree. This section will refer to these nodes as \texttt{Node3}s, \texttt{Node4}s and \texttt{Node5}s respectively.
 
-\begin{lstlisting}[language=rust, captionpos=b, caption={\texttt{VDB345} definition}, label={vdb345}]
+\begin{lstlisting}[language=rust, captionpos=b, caption={\texttt{VDB543} definition}, label={vdb543}]
 pub type N3<ValueType> = LeafNode<ValueType, 3>;
 pub type N4<ValueType> = InternalNode<ValueType, N3<ValueType>, 4>;
 pub type N5<ValueType> = InternalNode<ValueType, N4<ValueType>, 5>;
-pub type VDB345<ValueType> = VDB<ValueType, N5<ValueType>>;
+pub type VDB543<ValueType> = VDB<ValueType, N5<ValueType>>;
 \end{lstlisting}
 
 To calculate how much the in-memory size, in bytes, of each node the follwing calculation can be done, by taking into account the size of the 3D grid together with the masks:
@@ -193,8 +195,279 @@ A single Node5 represent $4069^3$ voxels in space, just under $69$ billion.
 This is where the power of the VDB data structure can be seen; models can have multiple \verb|Node5|s covering trillions of voxels in total all of which can be acessed in $O(1)$ time, by going three layers down the tree.
 
 
-\subsubsection{Reading \texttt{.vdb}}
-VDB was introduced along with an associated file format \verb|.vdb| which gives a compact representation of the data structure. In this section the part of the implementatio that reads VDB files and stores them into memory is covered.
+\subsubsection{Reading \texttt{.vdb files}}
+VDB was introduced along with an associated file format \verb|.vdb| which gives a compact representation of the data structure.
+This section covers the part of the implementation that reads VDB files and stores them into memory.
+
+Unfortunately, there is no official documentation of the format used to encode \verb|.vdb| files.
+The only ``official'' resource available is the OpenVDB codebase\supercite{openvdb:doc}.
+This article\supercite{vdbfile} goes over a file format reversed engineered from the OpenVDB codebase and the bytecode of \verb|.vdb| files.
+The implementation uses this latter, reversed engineered format, which only supports \verb|.vdb| from version 218 onwards.
+
+The following is an overview of the contents of a vdb file, as described in \cite{vdbfile}.
+
+\newacronym{uuid}{UUID}{Universally Unique Identifier}
+
+\begin{enumerate}
+  \item Header
+        \begin{enumerate}
+          \item Magic number spelling out `` BDV'' (8 bytes)
+          \item File version (u32)
+          \item Library major and minor versions (2 u32s)
+          \item Grid offsets to follow flag (u8)
+          \item \acrshort{uuid} (128-bit)
+          \item Metadata entries, length-based list
+          \item Number of grids (u32)
+        \end{enumerate}
+        Since multiple grids can be stored in a single file the following steps are repeated for all grids.
+  \item VDB Grid
+        Grids are composed of a grid metadata and a tree. In the engine's implementation they are just called \verb|VDB|, as seen in \cref{vdb:def}.
+        \begin{enumerate}
+          \item Name of the grid (length-based string)
+          \item Grid type (length-based string) \\
+                e.g. \verb|Tree_float_5_4_3| refers to a VDB543\<f32\> in the implementation.
+                This type $T$ will determine the size of the data when reading the tree data later on.
+          \item Instance parent (u32)
+          \item Byte offset to grid discriptor (u64)
+          \item Start and end location of grid data (2 u64)
+          \item Compression flags (u32)
+          \item\label{file:meta} Grid metadata, length-based list of metadata entries \\
+                An entry consits of entry name as length-based string, entry type as length-based list, and actual data
+          \item Transform matrices to apply to voxels coordinates to convert from index space to world space (4x4 f64s )
+        \end{enumerate}
+  \item VDB Tree
+        \verb|.vdb| files can have multiple trees associated with grid, hence after this step can be repeated for all trees in a grid.
+        \begin{enumerate}
+          \item the number 1 (u32)
+          \item background value of root node ($T$)
+          \item Number of tile values in root node (u32)
+          \item Number of children of the root node (u32)
+          \item Descend down the tree depth-first describing its \emph{topology}.
+                For each internal node, starting from the top layer.
+                The idea is to first describe the tree topology, the hierarchy of nodes, and then in a second pass in \cref{file:rec1} to give the actual voxel data.
+                \begin{enumerate}
+                \label{file:rec}
+                  \item The origin of the node, only for top level nodes (three i32)
+                  \item The child mask, only for internal nodes ($D^3$ bits)
+                  \item The value mask ($D^3$ bits)
+                  \item Compression flags
+                  \item Values, only for internal nodes ($D^{3} \times T$)
+                  \item Repeat \cref{file:rec} for every child in order of the mask
+                \end{enumerate}
+          \item\label{file:rec1} Leaf Node data as value mask + values ($D^{3}$ bits + $D^{3}\timesT$)
+
+                The LeafNodes are given in the same order they were covered in \cref{file:rec}
+        \end{enumerate}
+\end{enumerate}
+
+In the implementation of VDB file handling within the rendering engine, a specialized streaming reader, termed \texttt{VdbReader}, is designed to manage the reading process efficiently.
+This approach optimizes memory usage by processing the file's content incrementally, rather than loading the entire file into memory at once.
+This method is particularly beneficial since VDB files can have hundres of megabytes.
+
+The \texttt{VdbReader} is structured to sequentially process sections of the VDB file, creating nodes as it reads and assembles them into the complete VDB data structure shown in \cref{vdb:ds}.
+
+\texttt{VdbReader} reads from the VDB file according to the grid descriptors, constructing nodes from the data, ensuring each node is placed within the VDB hierarchy. This process involves interpreting the file's byte stream according to the VDB format specifications, converting this data into a usable form within the rendering engine.
+
+\begin{lstlisting}[language=rust, captionpos=b, caption={
+    \texttt{VdbReader} definition: \texttt{reader} is file stream handler, \texttt{grid\_descriptors} hold the metadata given in \cref{file:meta}.
+    \texttt{VdbReader} implementation: The method \texttt{read\_vdb\_grid} is shown, which is called after the file header is handled, and returns a VDB is the file contents matched the expectations from the header, if not it returns an error.
+  }, label={vdb:read}]
+pub struct VdbReader<R: Read + Seek> {
+  reader: R,
+  pub grid_descriptors: HashMap<String, GridDescriptor>,
+}
+
+impl<R: Read + Seek> VdbReader<R> {
+  ...
+  pub fn read_vdb_grid<T: VdbValueType>(&mut self, name: &str) -> Result<VDB<T>> {
+    let grid_descriptor = self.grid_descriptors.get(name).cloned()
+    .ok_or_else(|| ErrorKind::InvalidGridName(name.to_owned()))?;
+    grid_descriptor.seek_to_grid(&mut self.reader)?;
+
+    if self.header.file_version >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION {
+      let _: Compression = self.reader.read_u32::<LittleEndian>()?.try_into()?;
+    }
+    let _ = Self::read_metadata(&mut self.reader)?;
+
+    let mut vdb = self.read_tree_topology::<T>(&grid_descriptor)?;
+    self.read_tree_data::<T>(&grid_descriptor, &mut vdb)?;
+
+    Ok(vdb)
+  }
+}
+\end{lstlisting}
+
+With this reader implemented any \texttt{.vdb} file can be brought into the rendering engine, which will provide a series of models from the internet to use during testing and in the the results section. Additionally, thanks to the widespread adoption of VDB in modern 3D modelling tools like Blender and Maya any 3D model can be converted to VDB, essentially enabling any mesh to be pulled into the engine, albeit by stepping out of the engine first.
+
+\subsubsection{GPU VDB}
+\newacronym{cuda}{CUDA}{Compute Unified Device Architecture}
+
+The next step is desining a version of VDB that can be passed to the GPU in compute shaders. The authors of OpenVDB created a version of the VDB data structure, NanoVDB\supercite{nanovdb:doc} that can use \acrshort{cuda} instructions to GPU acceleration on the data structure. NanoVDB is explained very well by the authors in this article on the Nvidia blog \cite{nanovdb:art}.
+
+At this point this implementation diverges with what the OpenVDB library. The goal of this project is to optimize performance while supporting as many platforms as possible, and CUDA instructions are only supported on Nvidia hardware.
+
+In this section a custom implementation for a GPU compatibale, read-only version of VDB543 is presented. This version splits VDBs into two sperate components:
+\begin{enumerate}
+  \item\textbf{Mask group} This is a collection of 5 bindings, each an array of u32s that stores the masks for all nodes: 2 mask arrays for each internal node layer (Node5 and Node4) and 1 mask array for the leaf layer (Node3). Each array has length $N\frac{D^{3}}{32}$, where $N$ is the number of nodes it refers to. These 5 buffers are passed two the gpu in a storage buffer group each in a separate binding.
+
+\begin{lstlisting}[language=rust, captionpos=b, caption={
+    \texttt{MaskUniform} defintion: Each type of mask list is a separate binding. And additional binding created to store the origins of the top leval Node5 nodes.
+    \texttt{MaskUniform} implementation: The \texttt{bind} method generates all data needed to pass the mask group to compute shaders. The \texttt{create\_bind\_group\_layout}
+    function is the crtical part of this process, each binding is a storage buffer type with read-only access.
+}]
+pub struct MaskUniform {
+  kids5: Vec<Node5Mask>,
+  vals5: Vec<Node5Mask>,
+  kids4: Vec<Node4Mask>,
+  vals4: Vec<Node4Mask>,
+  vals3: Vec<Node3Mask>,
+  origins: Vec<[i32; 4]>,
+}
+
+impl MaskUniform {
+  pub fn bind(&self, device: &Device) ->
+  ([Buffer; 6], [Vec<u8>; 6], BindGroup, BindGroupLayout) {
+    let buffer_contents = self.get_contents();
+    let buffers = self.create_buffers(device, &buffer_contents);
+    let layout = self.create_bind_group_layout(device);
+    let bind_group = self.create_bind_group(&buffers, &layout, device);
+
+    (buffers, buffer_contents, bind_group, layout)
+  }
+  ...
+  fn create_bind_group_layout(&self, device: &Device) -> BindGroupLayout {
+    let entries = &(0..=5)
+    .map(|binding| wgpu::BindGroupLayoutEntry {
+      binding,
+      visibility: wgpu::ShaderStages::COMPUTE,
+      ty: wgpu::BindingType::Buffer {
+        ty: wgpu::BufferBindingType::Storage { read_only: true },
+        has_dynamic_offset: false,
+        min_binding_size: None,
+      },
+      count: None,
+    })
+    .collect::<Vec<_>>()[..];
+
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      entries,
+      label: Some("Mask Bind Group Layout"),
+    })
+  }
+}
+\end{lstlisting}
+
+    With the bind group created and integrated in the pipline compute shaders can now acess the topology of the datastructure
+
+\begin{lstlisting}[language=rust, captionpos=b, caption={
+    wgsl version of the mask arrays. Each buffer is divided into parts based on the size of the node it tackles. This enables getting all the masks of a node with a particular index by simply indexinf into the ray. For example, \texttt{kids5[0]} would gives the first child mask for the Node5 at index 0.
+}]
+struct Node5Mask { m: array<u32, 1024>, }; // 32^3/32
+struct Node4Mask { m: array<u32, 128>, };  // 16^3/32
+struct Node3Mask { m: array<u32, 16>, };   // 8^3/32
+
+@group(3) @binding(0)
+var<storage, read> kids5: array<Node5Mask>;
+@group(3) @binding(1)
+var<storage, read> vals5: array<Node5Mask>;
+@group(3) @binding(2)
+var<storage, read> kids4: array<Node4Mask>;
+@group(3) @binding(3)
+var<storage, read> vals4: array<Node4Mask>;
+@group(3) @binding(4)
+var<storage, read> vals3: array<Node3Mask>;
+@group(3) @binding(5)
+var<storage, read> origins: array<vec3<i32>>;
+\end{lstlisting}
+    A key part of this representation is the order in which node masks are given in each particular binding, meaning what how is the index of a Node in the value mask related to that same node in the CPU based data structure. The approach is the same as when reading \texttt{.vdb} files: a depth-first descent of the tree topology. This means the order nodes are in the GPU VDB representation is the same as the order they are given in the file.
+
+
+  \item\textbf{Atlas group} This is the bind group that stores all the voxel and child ``pointer'' in packed into atlases as 3D textures. This data type is the perfect storage type for 3D grids. This gives the ability to retain relative coordinates within the nodes while packing next to each other in memory. This technique was inspired by two articles \cite{octree:1,octree:2}. The latter presents a packing termed $N^{3}$-tree which presents a method to serialize octree nodes in an array of textures and store indicies in that same array to represent children nodes. This idea isn't directly applicable to VDB since nodes at different depths have different sizes so a lot of space would be wasted since the majoirty of the nodes are much smaller than the top level Node5 nodes. This can, however, be expanded by using a different texture atlas for every different type of node and cross referencing between each layer. For VDB543 This entails having three different atlases, with the first two's values Node5 and Node4 indexing into the Node4 and Node3 atlases.
+
+\begin{lstlisting}[language=rust, captionpos=b, caption={
+    \texttt{NodeAtlas} definition: The three fields in are the sizes of each atlas.
+    The \texttt{create\_textures} creates 3 textures, sets the correct dimensions and sets value type to \texttt{R32Uint} represent a 4 byte single channel which can be used depending on what the value represents.
+    The \texttt{create\_bind\_group\_layout} preparse the binding for compute shaders, setting the sample type to \texttt{Uint} to give eas of acess to the atlases; data.
+},label={atlas2idx}]
+pub struct NodeAtlas {
+  size5: [u32; 3],
+  size4: [u32; 3],
+  size3: [u32; 3],
+}
+
+impl NodeAtlas {
+  pub fn bind(&self, device: &Device)
+  -> ([Texture; 3], BindGroup, BindGroupLayout) {
+    let textures = self.create_textures(device);
+    let views = textures.iter()
+      .map(|texture| self.create_texture_view(&texture))
+      .collect::<Vec<_>>().try_into().unwrap();
+    let bind_group_layout = self.create_bind_group_layout(device);
+    let bind_group = self.create_bind_group(device, &bind_group_layout, &views);
+
+    (textures, bind_group, bind_group_layout)
+  }
+
+  fn create_textures(&self, device: &Device) -> [Texture; 3] {
+    [self.size5, self.size4, self.size3].map(|[w, h, d]| {
+      device.create_texture(&wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+          width: w,
+          height: h,
+          depth_or_array_layers: d,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D3,
+        format: wgpu::TextureFormat::R32Uint,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        label: Some("Atlas Texture"),
+        view_formats: &[],
+      })
+    })
+  }
+  ...
+
+  fn create_bind_group_layout(&self, device: &Device) -> BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      label: Some("Atlas Texture Bind Group Layout"),
+      entries: &[0, 1, 2].map(|binding| wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Texture {
+          sample_type: wgpu::TextureSampleType::Uint,
+          view_dimension: wgpu::TextureViewDimension::D3,
+          multisampled: false,
+        },
+        count: None,
+      }),
+    })
+  }
+}
+\end{lstlisting}
+        With the bindings implemented it is possible to fetch these in the shader code, finally bringing or VDB data to the GPU
+
+\begin{lstlisting}[language=rust, captionpos=b, caption={
+            wgsl atlas bindings, to get a value in the atlas at point $(x,y,z)$, \texttt{textureLoad(x,y,z).r} is called since all the data is stored on the red channel
+},label={atlas2idx}]
+@group(2) @binding(0)
+var node5s: texture_3d<u32>;
+@group(2) @binding(1)
+var node4s: texture_3d<u32>;
+@group(2) @binding(2)
+var node3s: texture_3d<u32>;
+\end{lstlisting}
+
+  Since, these are 3D textures a way of converting the indexing in the mask buffers to these texture atlases is needed. To that end, atlases are cube shaped, and nodes are packed in it by stacking them next to one another with coorinate priority $x > y > z$ in the same depth-first order as disscused previously. This idea yields a very simple transformation beetween the indexes of the mask bufferes and the coordinates in the texture atlas, shown in \cref{atlas2idx}
+
+\begin{lstlisting}[language=rust, captionpos=b, caption={wgsl transformation from index of node to coordinate in atlas},label={atlas2idx}]
+fn atlas_origin_from_idx(idx: u32, dim: u32) -> vec3<u32> {
+  return vec3(idx \% dim, (idx / dim) \% dim, idx / (dim * dim));
+}
+\end{lstlisting}
+\end{enumerate}
+
+The two types of VDB where covered GPU and CPU-based. To convert from the CPU-based structure to the GPU-based structure one simply recursively descends the tree in deaoth-first order, adding nodes to their corresponding atlases one by one, stacking them in the 3D texture.
+\end{enumerate}
 
 \subsubsection{Computing SDF}
-\subsubsection{GPU VDB}
