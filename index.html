@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Woxel</title>
+    <style>
+     canvas {
+       background-color: black;
+       padding: 0;
+       margin: auto;
+       display: block;
+       position: absolute;
+       top: 0;
+       bottom: 0;
+       left: 0;
+       right: 0;     }
+     body {
+       background-color: #d1b360;
+     }
+    </style>
+</head>
+
+<body id="wasm-example">
+  <script type="module">
+   import init from "./pkg/woxel.js";
+   init().then(() => {
+     console.log("WASM Loaded");
+   });
+
+   document.addEventListener('contextmenu', event => event.preventDefault());
+  </script>
+</body>
+
+</html>

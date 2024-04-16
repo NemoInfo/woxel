@@ -1,0 +1,9 @@
+/target
+/assets
+thesis/*
+!thesis/*.pdf
+!thesis/*.tex
+!thesis/*.bib
+!thesis/figures/
+!thesis/chapters/*.tex
+*-blx.bib

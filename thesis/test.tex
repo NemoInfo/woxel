@@ -1,0 +1,52 @@
+\documentclass{extra}
+
+\usepackage{graphicx,psfrag,color} % for postscript graphics files
+  \graphicspath{ {./figures/} }
+\usepackage{amsmath}               % assumes amsmath package installed
+  \allowdisplaybreaks[1]           % allow eqnarrays to break across pages
+\usepackage{amssymb}               % assumes amsmath package installed
+\usepackage{url}                   % format hyperlinks correctly
+\usepackage{rotating}              % allow portrait figures and tables
+\usepackage{multirow}              % allows merging of rows in tables
+\usepackage{lscape}                % allows pages to be typeset in landscape mode
+\usepackage{tabularx}              % allows fixed width tables
+\usepackage{verbatim}              % enhanced version of built-in verbatim environment
+\usepackage{footnote}              % allows more control over footnote environments
+\usepackage{float}                 % allows H option on floats to force here placement
+\usepackage{booktabs}              % improve table line spacing
+\usepackage{lipsum}                % for adding dummy text here
+\usepackage[base]{babel}           % for proper hypthenation in lipsum sections
+\usepackage{subcaption}            % for multiple sub-figures in a single float
+\usepackage{cleveref}
+\usepackage{xcolor}
+\usepackage{color}
+\usepackage[inkscapelatex=false]{svg}
+\usepackage[acronym]{glossaries}
+\usepackage{listings}
+\usepackage{listings-rust}
+\usepackage{multicol}
+\usepackage{bm}
+\usepackage{enumitem}
+\newtheorem{theorem}{Theorem}
+\newcommand{\degree}{\ensuremath{^\circ}}
+\newcommand{\sus}[1]{$^{\mbox{\scriptsize #1}}$} % superscript in text (e.g. 1st)
+\newcommand{\sub}[1]{$_{\mbox{\scriptsize #1}}$} % subscript in text
+\AtBeginEnvironment{quote}{\par\singlespacing\small}
+
+%%%%%%%%%%%%%%%%%% REFERENCES SETUP %%%%%%%%%%%%%%%%%%
+\usepackage[style=ieee,backend=biber,backref=true,hyperref=auto,backend=bibtex]{biblatex}
+% \DefineBibliographyStrings{english}{backrefpage = {cited on p\adddot},  backrefpages = {cited on pp\adddot}}
+\addbibresource{ref.bib}
+
+
+\begin{document}
+
+\begin{lstlisting}[language=rust]
+#[repr(C)]
+int main() {
+  printf("Hello, world!\n");
+  return 0;
+}
+\end{lstlisting}
+
+\end{document}

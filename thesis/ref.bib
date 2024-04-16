@@ -1,0 +1,195 @@
+@article{vdb2013,
+author = {Museth, Ken},
+title = {VDB: High-resolution sparse volumes with dynamic topology},
+year = {2013},
+issue_date = {June 2013},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {32},
+number = {3},
+issn = {0730-0301},
+url = {https://doi.org/10.1145/2487228.2487235},
+doi = {10.1145/2487228.2487235},
+abstract = {We have developed a novel hierarchical data structure for the efficient representation of sparse, time-varying volumetric data discretized on a 3D grid. Our “VDB”, so named because it is a Volumetric, Dynamic grid that shares several characteristics with B+trees, exploits spatial coherency of time-varying data to separately and compactly encode data values and grid topology. VDB models a virtually infinite 3D index space that allows for cache-coherent and fast data access into sparse volumes of high resolution. It imposes no topology restrictions on the sparsity of the volumetric data, and it supports fast (average O(1)) random access patterns when the data are inserted, retrieved, or deleted. This is in contrast to most existing sparse volumetric data structures, which assume either static or manifold topology and require specific data access patterns to compensate for slow random access. Since the VDB data structure is fundamentally hierarchical, it also facilitates adaptive grid sampling, and the inherent acceleration structure leads to fast algorithms that are well-suited for simulations. As such, VDB has proven useful for several applications that call for large, sparse, animated volumes, for example, level set dynamics and cloud modeling. In this article, we showcase some of these algorithms and compare VDB with existing, state-of-the-art data structures.},
+journal = {ACM Trans. Graph.},
+month = {jul},
+articleno = {27},
+numpages = {22},
+keywords = {Volumes, fluid animation, implicit surfaces, level sets}
+}
+
+@inproceedings{vdb2014,
+author = {Museth, Ken},
+title = {Hierarchical digital differential analyzer for efficient ray-marching in OpenVDB},
+year = {2014},
+isbn = {9781450329606},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/2614106.2614136},
+doi = {10.1145/2614106.2614136},
+booktitle = {ACM SIGGRAPH 2014 Talks},
+articleno = {40},
+numpages = {1},
+location = {Vancouver, Canada},
+series = {SIGGRAPH '14}
+}
+
+@book{rustbook,
+author = {Klabnik, Steve and Nichols, Carol},
+title = {The Rust Programming Language},
+year = {2018},
+isbn = {1593278284},
+publisher = {No Starch Press},
+address = {USA},
+abstract = {The Rust Programming Language is the official book on Rust, an open-source, community-developed systems programming language that runs blazingly fast, prevents segfaults, and guarantees thread safety. This is the undisputed go-to guide to Rust, written by two members of the Rust core team, with feedback and contributions from 42 members of the community. The book assumes that youve written code in another programming language but makes no assumptions about which one, meaning the material is accessible and useful to developers from a wide variety of programming backgrounds. Known by the Rust community as The Book, The Rust Programming Language includes concept chapters, where youll learn about a particular aspect of Rust, and project chapters, where youll apply what youve learned so far to build small programs. The Book opens with a quick hands-on project to introduce the basics then explores key concepts in depth, such as ownership, the type system, error handling, and fearless concurrency. Next come detailed explanations of Rust-oriented perspectives on topics like pattern matching, iterators, and smart pointers, with concrete examples and exercises--taking you from theory to practice. The Rust Programming Language will also show you how to:- Grasp important concepts unique to Rust, like ownership, borrowing, and lifetimes- Use Cargo, Rusts built-in package manager, to build and maintain your code, including downloading and building dependencies- Effectively use Rusts zero-cost abstractions and employ your own Youll learn to develop reliable code thats speed and memory efficient, while avoiding the infamous and arcane programming pitfalls common at the systems level. When you need to dive down into lower-level control, this guide will show you how without taking on the customary risk of crashes or security holes and without requiring you to learn the fine points of a fickle toolchain. Youll also learn how to create command line programs, build single- and multithreaded web servers, and much more. The Rust Programming Language fully embraces Rusts potential to empower its users. This friendly and approachable guide will help you build not only your knowledge of Rust but also your ability to program with confidence in a wider variety of domains.}
+}
+
+@manual{webgpu:doc,
+  title = {WebGPU},
+  organization = {World Wide Web Consortium (W3C)},
+  year = {2023},
+  url = {https://www.w3.org/TR/webgpu/},
+}
+
+@misc{wgpu:doc,
+  author = {wgpu Project},
+  title = {wgpu: Rust Graphics API},
+  year = {2023},
+  url = {https://wgpu.rs/},
+}
+
+@misc{winit:doc,
+  title = {winit Crate},
+  url = {https://docs.rs/winit/latest/winit/},
+  year = {2024}
+}
+
+@misc{camera_rays,
+  author = {Scratchapixel},
+  title = {Ray Tracing: Generating Camera Rays},
+  year = {2021},
+  url = {https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html},
+}
+
+@misc{egui:doc,
+  title = {egui Crate},
+  url = {https://docs.rs/egui/latest/egui/},
+  year = {2024}
+}
+
+
+@misc{im_gui,
+  author = {Casey Muratori},
+  title = {Immediate-Mode Graphical User Interfaces},
+  url = {https://caseymuratori.com/blog_0001},
+  year = {2005}
+}
+
+@misc{im_vs_rt,
+  author = {Radich Quinn},
+  title = {Retained Mode Versus Immediate Mode},
+  url = {https://learn.microsoft.com/en-us/windows/win32/learnwin32/retained-mode-versus-immediate-mode},
+  year = {2018}
+}
+
+@misc{rust:generic,
+  title = {The Rust Reference, 6.14 Generic parameters},
+  url = {https://doc.rust-lang.org/reference/items/generics.html},
+  year = {2024}
+}
+
+
+@misc{openvdb:doc,
+  title = {OpenVdb Documentation},
+  organization  = {Academy Software Foundation(ASWF)},
+  url = {https://www.openvdb.org/documentation/doxygen/},
+  year = {2023}
+}
+
+@misc{vdbfile,
+  title = {VDB: A deep dive},
+  author = {Said Al Attrach},
+  organization = {JengaFX},
+  url = {https://jangafx.com/2022/09/29/vdb-a-deep-dive/},
+  year = {2022}
+}
+
+
+@misc{nanovdb:doc,
+  title = {NanoVDB Documentation},
+  organization  = {Academy Software Foundation(ASWF)},
+  url = {https://www.openvdb.org/documentation/doxygen/NanoVDB_MainPage.html},
+  year = {2023}
+}
+
+@misc{nanovdb:art,
+  title = {Accelerating OpenVDB on GPUs with NanoVDB},
+  authors = {Wil Braithwaite, Ken Museth},
+  url = {https://developer.nvidia.com/blog/accelerating-openvdb-on-gpus-with-nanovdb/},
+  year = {2020}
+}
+
+@article{octree:2,
+author = {Benson, David and Davis, Joel},
+title = {Octree textures},
+year = {2002},
+issue_date = {July 2002},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {21},
+number = {3},
+issn = {0730-0301},
+url = {https://doi.org/10.1145/566654.566652},
+doi = {10.1145/566654.566652},
+abstract = {Texturing using a set of two dimensional image maps is an established and widespread practice. However, it has many limitations. Parameterizing a model in texture space can be very difficult, particularly with representations such as implicit surfaces, subdivision surfaces, and very dense or detailed polygonal meshes. This paper proposes the use of a new kind of texture based on an octree, which needs no parameterization other than the surface itself, and yet has similar storage requirements to 2D maps. In addition, it offers adaptive detail, regular sampling over the surface, and continuity across surface boundaries. The paper addresses texture creation, painting, storage, processing, and rendering with octree textures.},
+journal = {ACM Trans. Graph.},
+month = {jul},
+pages = {785–790},
+numpages = {6},
+keywords = {volume texture}
+}
+
+@incollection{octree:1,
+  title = {Octree Textures on the GPU},
+  author = {Aaron E. Lefohn and Joe M. Kniss and Robert Strzodka and Shubhabrata Sengupta and John D. Owens},
+  booktitle = {GPU Gems 2},
+  editor = {Matt Pharr},
+  publisher = {Addison-Wesley Professional},
+  year = {2005},
+  chapter = {37},
+  url = {https://developer.nvidia.com/gpugems/gpugems2/part-v-image-oriented-computing/chapter-37-octree-textures-gpu},
+  note = {Accessed: April 2024}
+}
+
+@book{chebyshev,
+place={Cambridge},
+title={Modern Mathematical Methods for Physicists and Engineers},
+publisher={Cambridge University Press},
+author={Cantrell, C. D.},
+year={2000}
+}
+
+@article{chamfer,
+author = {Butt, Muhammad and Maragos, Petros},
+year = {1998},
+month = {02},
+pages = {1477-84},
+title = {Optimum Design of Chamfer Distance Transforms},
+volume = {7},
+journal = {IEEE transactions on image processing : a publication of the IEEE Signal Processing Society},
+doi = {10.1109/83.718487}
+}
+
+@Inbook{light,
+author="Koppal, Sanjeev J.",
+editor="Ikeuchi, Katsushi",
+title="Lambertian Reflectance",
+bookTitle="Computer Vision: A Reference Guide",
+year="2014",
+publisher="Springer US",
+address="Boston, MA",
+pages="441--443",
+isbn="978-0-387-31439-6",
+doi="10.1007/978-0-387-31439-6_534",
+url="https://doi.org/10.1007/978-0-387-31439-6_534"
+}
