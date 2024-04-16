@@ -5,4 +5,8 @@ thesis/*
 !thesis/*.tex
 !thesis/*.bib
 !thesis/figures/
+<<<<<<< HEAD
+=======
+!thesis/chapters/*.tex
+>>>>>>> main
 *-blx.bib
