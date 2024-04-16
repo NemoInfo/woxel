@@ -79,16 +79,8 @@ fn modulo_vec3f(x: vec3<f32>, y:f32) -> vec3<f32> {
     return x - y * floor(x / y); 
 }
 
-<<<<<<< HEAD
-// MATERIAL CONSTANTS
-const k_d: f32 = 0.7;
-=======
->>>>>>> main
-
 const HDDA_MAX_RAY_STEPS: u32 = 1000u;
 const scale = array<f32, 4>(1., 8., 128., 4096.);
-
-
 fn hdda_ray(src: vec3<f32>, dir: vec3<f32>) -> HDDAout {
     var p: vec3<f32> = src;
     let step: vec3<f32> = sign11(dir);
@@ -148,20 +140,15 @@ struct HDDAout {
     // Iteration of return
     i: u32,
 }
-<<<<<<< HEAD
 
-const REFLECTIVITY: f32 = 0.7;
-const WALL_I: f32 = 0.1;
-=======
 // MATERIAL CONSTANTS
 const k_d: f32 = 0.7;
 const k_a: f32 = 0.3;
 const REFLECTIVITY: f32 = 0.7;
 const WALL_I: f32 = 0.1;
-const BASE_COLOR: vec3<f32> = vec3(0.03, 0.1, 0.00);
-const AMBIENT_COLOR: vec3<f32> = vec3(0.1, 0.1, 0.1);
+const BASE_COLOR: vec3<f32> = vec3(0.4, 0.3, 0.4);
+const AMBIENT_COLOR: vec3<f32> = vec3(0.3, 0.3, 0.3);
 
->>>>>>> main
 fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let hit: HDDAout = hdda_ray(src, dir);
     let step: vec3<f32> = sign11(dir);
@@ -172,7 +159,7 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             grid = vec3<f32>(-0.3, -0.3, 1.0);
         }
         else if s.show_345[1] == 1u && any(floor(hit.p) % 128. == 0.) {
-            grid = vec3<f32>(-0.1, 0.0, 0.8);
+            grid = vec3<f32>(0.6, -0.2, -0.2);
         }
         else if s.show_345[0] == 1u && any(floor(hit.p) % 8. == 0.) {
             grid = vec3<f32>(-0.1, 0.5, 0.3);
@@ -194,18 +181,6 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
         }
         case 3u: {
             let N = normalize(-step * vec3<f32>(hit.mask));
-<<<<<<< HEAD
-            var I = s.sun_color.a * k_d * dot(-s.sun_dir, N);
-            // If angle is obtouse, that side is in shadow
-            I = max(0.0, I);
-
-            if I != 0.0  &&
-               hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir).state == 0u {
-                return vec3(0.1) + I * s.sun_color.xyz * 0.05;
-            }
-
-            return vec3(0.1) + I * s.sun_color.xyz;
-=======
             let LN = max(0.0, s.sun_color.a * dot(-s.sun_dir, N));
             var I_d = k_d * s.sun_color.xyz * BASE_COLOR * LN;
             var I_a = k_a * AMBIENT_COLOR * BASE_COLOR;
@@ -216,7 +191,6 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             }
 
             return I_a + I_d;
->>>>>>> main
         }
         case 4u: {
             let N = normalize(-step * vec3<f32>(hit.mask));
@@ -227,17 +201,10 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 
             if I != 0.0  &&
                hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir).state == 0u {
-<<<<<<< HEAD
-                mcol = vec3(0.1) + I * s.sun_color.xyz * 0.05;
-            }
-            else {
-                mcol = vec3(0.1) + I * s.sun_color.xyz;
-=======
                 mcol = BASE_COLOR + I * s.sun_color.xyz * 0.05;
             }
             else {
                 mcol = BASE_COLOR + I * s.sun_color.xyz;
->>>>>>> main
             }
 
             if hit.p.y > 0.0 {
@@ -281,12 +248,12 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
             let Np = max(vec3(0.0), N);
             let Nn = -min(vec3(0.0), N);
 
-            return vec3<f32>(WALL_I, 0.0, 0.0) * Np.x +
+            return mix(vec3<f32>(WALL_I, 0.0, 0.0), vec3(WALL_I * 0.1, 0.0, 0.0), hit.p.y / 4096.) * Np.x +
                 vec3<f32>(0.0, WALL_I, 0.0) * Np.y +
-                vec3<f32>(0.0, 0.0, WALL_I) * Np.z +
-                vec3<f32>(WALL_I, WALL_I, 0.0) * Nn.x +
+                mix(vec3<f32>(0.0, 0.0, WALL_I), vec3(0.0, 0.0, WALL_I * 0.1), hit.p.y / 4096.) * Np.z +
+                mix(vec3<f32>(WALL_I, WALL_I, 0.0), vec3(WALL_I * 0.1, WALL_I * 0.1, 0.0), hit.p.y / 4096.) * Nn.x +
                 vec3<f32>(0.0, WALL_I, WALL_I) * Nn.y +
-                vec3<f32>(WALL_I, 0.0, WALL_I) * Nn.z;
+                mix(vec3<f32>(WALL_I, 0.0, WALL_I), vec3(WALL_I * 0.1, 0.0, WALL_I * 0.1), hit.p.y / 4096.) * Nn.z;
         }
         default: {
            return vec3(0.0) + dot(vec3<f32>(hit.mask) * vec3(0.01, 0.02, 0.03), vec3(1.0));
@@ -316,17 +283,10 @@ fn reflect_ray2(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 
         if I != 0.0  &&
         hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir).state == 0u {
-<<<<<<< HEAD
-            mcol = vec3(0.1) + I * s.sun_color.xyz * 0.05;
-        }
-        else {
-            mcol = vec3(0.1) + I * s.sun_color.xyz;
-=======
             mcol = BASE_COLOR + I * s.sun_color.xyz * 0.05;
         }
         else {
             mcol = BASE_COLOR + I * s.sun_color.xyz;
->>>>>>> main
         }
 
         return mix(mcol, rcol, REFLECTIVITY);
@@ -360,15 +320,9 @@ fn reflect_ray1(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 
         if I != 0.0  &&
         hdda_ray(hit.p - 4e-2 * step * vec3<f32>(hit.mask), -s.sun_dir).state == 0u {
-<<<<<<< HEAD
-            return vec3(0.1) + I * s.sun_color.xyz * 0.05;
-        }
-        return vec3(0.1) + I * s.sun_color.xyz;
-=======
             return BASE_COLOR + I * s.sun_color.xyz * 0.05;
         }
         return BASE_COLOR + I * s.sun_color.xyz;
->>>>>>> main
     }
 
     if hit.state == 1u {

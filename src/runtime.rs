@@ -80,6 +80,17 @@ impl Runtime {
                         ..
                     } => self.handle_cursor_pressed(),
                     WindowEvent::CursorMoved { position, .. } => self.handle_cursor_move(*position),
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                state: ElementState::Pressed,
+                                virtual_keycode: Some(VirtualKeyCode::H),
+                                ..
+                            },
+                        ..
+                    } => {
+                        self.context.egui_dev.show = !self.context.egui_dev.show;
+                    }
                     _ => {}
                 }
             }

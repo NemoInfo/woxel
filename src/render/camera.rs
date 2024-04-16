@@ -44,10 +44,8 @@ impl Camera {
             Some(c) => c,
             None => panic!("Could not invert camera matrix"),
         };
-<<<<<<< HEAD
         // @TODO: Thorough check this !!! No chance I got it right the first time
-=======
->>>>>>> main
+
         let height = width / self.aspect;
         let u = camera_to_world.x;
         let v = camera_to_world.y;

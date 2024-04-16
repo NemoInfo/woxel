@@ -43,6 +43,7 @@ pub struct EguiDev {
     pub sun_settings: SunSettings,
     pub recording: bool,
     pub recording_file: String,
+    pub show: bool,
     last_fps_update: Instant,
     time_last_frame: Instant,
     past_fps: Vec<f32>,
@@ -64,6 +65,7 @@ impl EguiDev {
             past_fps: vec![0.0; 200],
             recording: false,
             recording_file: "output.mp4".to_string(),
+            show: true,
         }
     }
 

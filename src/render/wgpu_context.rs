@@ -327,20 +327,22 @@ impl WgpuContext {
             }
         }
 
-        self.egui_rpass
-            .add_textures(&self.device, &self.queue, &tdelta)
-            .expect("add textures ok");
-        self.egui_rpass
-            .update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
-        self.egui_rpass
-            .execute(
-                &mut encoder,
-                &output_view,
-                &paint_jobs,
-                &screen_descriptor,
-                None,
-            )
-            .unwrap();
+        if self.egui_dev.show {
+            self.egui_rpass
+                .add_textures(&self.device, &self.queue, &tdelta)
+                .expect("add textures ok");
+            self.egui_rpass
+                .update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
+            self.egui_rpass
+                .execute(
+                    &mut encoder,
+                    &output_view,
+                    &paint_jobs,
+                    &screen_descriptor,
+                    None,
+                )
+                .unwrap();
+        }
 
         self.queue
             .write_buffer(&state_buffer, 0, &state_buffer_contents);
@@ -405,9 +407,12 @@ impl WgpuContext {
 
         output.present();
 
-        self.egui_rpass
-            .remove_textures(tdelta)
-            .expect("remove textures ok");
+        if self.egui_dev.show{
+            self.egui_rpass
+                .remove_textures(tdelta)
+                .expect("remove textures ok");
+
+        }
 
         if model_changed {
             self.change_vdb_model(self.egui_dev.models[self.egui_dev.selected_model].clone());
