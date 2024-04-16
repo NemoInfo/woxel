@@ -3,15 +3,15 @@
 %%% TeX-master: "../main"
 %%% End:
 
-\section{Background and Literature Review}
-\subsection{Rendering engines}
+\part{Background and Literature Review}
+\section{Rendering engines}
 Graphics engines serve as the core software components responsible for rendering visual content in applications ranging from video games to scientific simulations and visual effects in movies.
 Engines abstract the complexities of rendering by providing developers with high-level tools and interfaces to represent digital enviorments.
 
 The evolution of rendering engines over time reflects the advancments in computational techniques and hardware capabilities enabling more realisitic and immersive experiences
 
 [add history]
-\subsubsection{Primitves}
+\subsection{Primitves}
 At the heart of any graphical engine is the concept of primitives, the simplest forms of graphical objects that the engine can process and render. Primitives are builiding blocks from which more complex shapes and scenes can be constructed.
 
 \textbf{Polygons}, particullary triangles, are the most commonly used primitives in 3D graphics. This is owed to their simplicity and flexibility, allowing the construction of virtually any 3D shape through \emph{tesselation}. Polygonal meshes define the surfaces of objects in a scene, with each vertex of a polygon typically associated with additional information such as color, texture coordinates, and normal vectors for lighting calculations.
@@ -19,7 +19,7 @@ At the heart of any graphical engine is the concept of primitives, the simplest 
 \textbf{Voxels} represent a different approach to defining 3D shapes, they are essentially three-dimensional pixels. Where polygons define surfaces, voxels establish volume, with each voxel being able to contain color and density information.
 This charactheristic makes voxels particuallry well-suited for rendering scenes with materials that have intricate internal structures, such as fog, smoke, fire and fluids.
 
-\subsubsection{Ray-tracing vs. Rasterization}
+\subsection{Ray-tracing vs. Rasterization}
 Rendering engines can utilise two main rendering techniques for rendering scenes: ray tracing and rasterization, both having their advantages and trade-offs.
 
 \textbf{Rasterization} is the most widespread technique  used in real-time applications.
@@ -28,10 +28,10 @@ Over the development of the industry of graphics programming, graphics hardware 
 
 \textbf{Ray-Tracing}, in contrast, simulatesthe path of light as rays travelling through a scene to produce images with realistic lighting, shadows, reflections, and refractions. Ray tracing is computationally intensive but yields higher-quallity images, makeing it favored for applications where visual fidelity is critical. However, recent advancements in hardware have begun to bring real-time ray tracing to interactive applications.
 
-\subsection{Representing voxels}
+\section{Representing voxels}
 To efficiently represent and manipualte voxels in program memory, various data structures can be employed. Each method entails trade-offs between memory usage, access speed and complexity of implementation. Access speed referes to the time complexity of querying the datastructure at an arbitray point in space to retrieve a potential voxel.
 
-\subsubsection{Voxel grids}
+\subsection{Voxel grids}
 A voxel grid is the most straightforwad and intuitive approach to representing volumetric data. The 3D space is divided into a regular grid of voxels, each holding information such as color, material properties, or density. This method provides direct $O(1)$ access to voxel data.
 
 However, this simplicity comes at a signficant disatvantage: memory consumption.
@@ -41,7 +41,7 @@ For example, consider a scene with two voxels that are a million units appart in
 A voxel grid would have to store all the empty voxels inbetween; $10^{18}$ memory units reserved, 2 of which carry usefull data.
 This limitation makes the naive voxel grids impractical for large or highly detailed scenes.
 
-\subsubsection{Hierarchical voxel grids (N-trees)}
+\subsection{Hierarchical voxel grids (N-trees)}
 To mitigate this issues, hierarchical grids, such as octrees, are employed. An octree is a tree data structure where each node represents a cubic portion of 3D space and has up to eight children. This division continues recursively, allowing for varying levels of detail within the scene: larger volumes are represented by higher-level nodes, while finer details are captured in lowere levels.
 
 The primary advantage of using an octree is spatial efficiency. Regions of the space that are empty or contain uniform data can be represented by a single node, significantly reducing the memory footprint. Furthermore, octrees facilitate efficient querying operations, such as collision detection and ray tracing, by allowing the algorithm to quickly discard large empty or irrelevant regions of space.
@@ -52,7 +52,7 @@ Nonetheless, for applications requiring large, detailed scenes with a mix of den
 
 [add history]
 
-\subsubsection{VDB}
+\subsection{VDB}
 \newacronym{bpt}{B+tree}{A m-ary tree with a variable but often large number of children per node.}
 \newacronym{vdb}{VDB}{Volumetric Dynamic B+tree grid data structure introduced by Ken Museth\supercite{vdb2013}}
 
@@ -76,16 +76,16 @@ The VDB data structure was introduced along with a several algorithms that make 
 \end{enumerate}
 These benefist make VDB a very compelling data structure to serve as the building block of voxel-based rendering engine.
 
-\subsection{Ray tracing}
+\section{Ray tracing}
 In order to render a scene using ray tracing, camera rays are shot throught the view frustum and into the scene. At each object intersection, part of a ray will get absorbed, reflected and refracted. In order to acheive realistic results, a rendering engine needs to model as many of these light interactions as possible in each frame's time budget.
 
 This section delves into the integration of ray tracing within the graphics pipeline and the methods used to implement it, focusing on casting a ray through a scene.
 
-\subsubsection{Graphics pipeline}
+\subsection{Graphics pipeline}
 The graphics pipeline of a rendering engine is the underlying system of a rendering engine that transforms a 3D scene into a 2D representation that is presented on a screen. While rasterization transforms 3D objects into 2D images through a series of stages(vertex processing, shape assembly, gemoetry shading, rasterization, and fragment processing), the ray tracing pipelines introduces a paradigm shift. It primarly involves calculating the path of rays from the eye (camera) through pixels in a image plane and into the scene, potentially bouncing off surfaces or passing through transparent materials before contributing to the color of a pixel.
 
 This step of calculating a rays path is central in ray tracing, and as such, the performance of the algorithm that does this calculation is critical.
-\subsubsection{Casting a ray}
+\subsection{Casting a ray}
 Ray casting techniques vary depending on the representation of the 3D world within the rendering engine.
 This section introduces basic ray casting techniques, while subsequent discussions will cover methods specific to voxel-based environments.
 
@@ -128,7 +128,7 @@ SDF are not without drawbacks, they can be difficult to maintain, and computatio
 
 [add history]
 
-\subsubsection{Casting a ray on a voxel grid}
+\subsection{Casting a ray on a voxel grid}
 The ray casting methods presented so far do not take advantage of the discrete grid of voxel that this rendering engine is based on. In this section, efficient algorithms that can use the underlying representation of hierarchical voxel grid are presented.
 
 \vspace{0.5cm}
@@ -160,9 +160,4 @@ A version of the HDDA algorithm for the VDB data structure was introduced by Ken
 
 This algorithm can be highly efficient, large empty areas can be skipped in a single step, drastically reducing the required steps to march a ray.
 
-\subsection{Summary of simmilar systems}
-
-%%% Local Variables:
-%%% mode: latex
-%%% TeX-master: "../main"
-%%% End:
+\section{Summary of simmilar systems}

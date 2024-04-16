@@ -3,11 +3,11 @@
 %%% TeX-master: "../main"
 %%% End:
 
-\section{Methodology}
+\part{Methodology}
 This section outlines the implementation details of the voxel rendering engine, starting from the selection of programming languages and libraries, going over the architecture of the engine, and diving deep into the data structures and algorithms employed, particularly focusing on VDB for voxel representation and the optimization of ray casting algorithms.
 Finally, this section will discuss the extension of these algorithms to full-fledged ray tracing, allowing for dynamic lightning and glossy material support.
 
-\subsection{Rust \& wgpu}
+\section{Rust \& wgpu}
 \hyphenation{WebGPU}
 
 The voxel rendering engine is built using \textbf{Rust}, a programming language known for its focus on safety, speed, and concurrency\supercite{rustbook}.
@@ -32,7 +32,7 @@ The combination of Rust and wgpu offers several advantages for the development o
 These technical choices form the foundation upon which the voxel rendering engine is constructed. Following this, the engine's architecture is designed to take full advantage of Rust's performance and safety features and wgpu's flexible, low-level graphics capabilities, setting the stage for the implementation of advanced voxel representation techniques and optimized ray tracing algorithms.
 
 
-\subsection{Engine architecture}
+\section{Engine architecture}
 
 The engine's operation is centered around an event-driven main loop that blocks the main thread.
 This loop processes various events, ranging from keyboard inputs to redraw requests, and updates the window, context, and scene accordingly, routing each event to it's corresponding handler.
@@ -44,7 +44,7 @@ This loop processes various events, ranging from keyboard inputs to redraw reque
 \end{figure}
 
 
-\subsubsection{Runtime}
+\subsection{Runtime}
 \newacronym{os}{OS}{Operating System}
 \begin{samepage}
 At the engine's core, sits \texttt{Runtime}  structure, which manages the interaction between the it's main components:
@@ -79,12 +79,12 @@ Another key event is the \verb|RedrawRequested| event, which signals that a new 
 
 The \verb|RedrawRequested| event is actually emmited in \verb|Runtime|, when it receives the \verb|MainEventsCleared| event, it scheduels the window for a redraw.
 
-\subsubsection{Window}
+\subsection{Window}
 The \verb|Window| data structure, included in the \textbf{winit}\supercite{winit:doc} crate, handles window creation and management, and provides an interface to the GUI window through an event loop. This event loop is what \verb|Runtime|'s main loop is mounted on.
 
 The interaction between the \verb|Window| and the \verb|Runtime| forms an event-driven workflow. The window emmits events and the runtime manages and distributes these events accordingly, forming a sort of feedback loop.
 
-\subsubsection{Scene}\label{scene:def}
+\subsection{Scene}\label{scene:def}
 The \verb|Scene| data structe holds information about the enviorment that is being rendered, this includes the model, camera, and engine state.
 
 \begin{lstlisting}[language=rust,caption={Scene definition},captionpos=b]
@@ -111,7 +111,7 @@ In this section, the camera and satte implementation is covered, the model will 
 The eye and target are updated when moving the camera through a \verb|CameraController| struct that handles keyboard and mouse input. Th FOV and aspect ratio are set based on the window proportions, to avoid distortion. The way in which this camera information is used will be detailed in the primitives section [add link] where we dive into what information is actually sent to the GPU in compute shaders.
 
 
-\subsubsection{WgpuContext}
+\subsection{WgpuContext}
 The \verb|WgpuContext| structure is the backbone of the rendering pipeline in the voxel rendering engine. It contains the necessary components for interfacing with the GPU using the wgpu API, managing resources such as textures, shaders, and buffers, and executing rendering commands.
 
 Broadly, \verb|WgpuContext| has the follwing responsablities:
@@ -124,7 +124,7 @@ Broadly, \verb|WgpuContext| has the follwing responsablities:
         It triggers compute shaders for voxel data processing, manages texture and buffer updates, and executes the render pipeline. Additionally, it manages shader hot-reloading, renders the developer GUI and handles screen capture for recording.
 \end{enumerate}
 
-\subsubsection{Graphichs Pipeline}
+\subsection{Graphichs Pipeline}
 This section provides an overview of the graphics pipline that is initiated at a \verb|RedrawRequest| event.
 
 \begin{figure}[H]
@@ -149,14 +149,14 @@ This section provides an overview of the graphics pipline that is initiated at a
 \end{minipage}
 \end{figure}
 
-\subsubsection{GPU Types}
+\subsection{GPU Types}
 This section covers the \verb|FrameDescriptor| data structe and how it generates GPU bindings from the data in \verb|Scene| which is stored on the CPU.
 
 Virtually the entire ray-tracing algorithm is run in compute shaders. This means all the information about the model, camera, lights, and metadata has to be passed through.
 
 The statically sized data i.e. the camera, sunlight and metadata is passed in an uniform buffer. This buffer is assembled inside the \verb|FrameDescriptor| which wraps \verb|ComputeState|.
 
-\begin{lstlisting}[language=Rust]
+\begin{lstlisting}[language=rust]
 #[repr(C)]
 pub struct ComputeState {
   view_projection: [[f32; 4]; 4],
@@ -192,7 +192,7 @@ impl ComputeState {
 
 The role of \verb|ComputeState| is to translate high level CPU structures onto these low level GPU types. In future sections the function of the structures fields will be detailed thoroughly.
 
-\subsubsection{Camera}
+\subsection{Camera}
 
 This section explains how the 3D ray-casting camera is implemented. To role of a camera in a ray-tracing engine is to cast rays from the eye of the camera through the middle of the pixels and into the scene.
 
@@ -244,7 +244,7 @@ This form of the ray direction equation is very useful since the vectors $\bm{u}
 
 In the implementation, the calculation of these constant vectors is the responsibility of the \verb|ComputeState| data structure; the \verb|build| method (\cref{cstate:build}) takes in a \verb|Camera| specified by its eye, target, \acrshort{fov} and aspect ratio, and computes the view projection matrix, inverts it to get the camera to world matrix, extracts $\bm{u}, \bm{v}$ and $\bm{w}$, then uses the screen's resolution to calculate $\bm{w'}$. It then packs these vectors into 16 byte arrays.
 
-\subsubsection{Shaders}
+\subsection{Shaders}
 In this section the role of the three shader stages in the implementation is explained.
 
 \begin{multicols}{2}
@@ -274,7 +274,7 @@ In this section the role of the three shader stages in the implementation is exp
   \end{figure}
 \end{multicols}
 
-\subsubsection{GUI}
+\subsection{GUI}
 \newacronym{gui}{GUI}{Graphical User Interface}
 
 This section covers the implementation of the \acrshort{gui} that allows the scene to active model to be changed, lighting to be modified, but also provides usefull developer metrics like ms/frame and other benchmarks.
@@ -296,7 +296,7 @@ The GUI code is run as part of the graphics pipeline in the following steps:
 \end{enumerate}
 
 [maybe add screen shot?]
-\subsubsection{Recording}
+\subsection{Recording}
 
 The engine includes an integrated screen recorder designed to efficiently capture screen footage without compromising the frame rate. Unlike external tools such as OBS, which must capture screen output externally and can be slow due to their inability to access application internals, this engine captures the output texture directly before it is displayed on the screen. This method significantly reduces the time required for capture, giving smoother results, and keeping the frame rate high.
 
@@ -307,3 +307,8 @@ The engine includes an integrated screen recorder designed to efficiently captur
 \end{figure}
 
 The key aspect of this process is to ensure that texture transfer and video encoding are handled asynchronously on a separate thread. This is done using a Producer-Consumer pattern, where the main thread acts as the producer. It periodically places frames into a blocking queue. From this queue, an encoding thread, acting as the consumer, retrieves and processes the frames. This includes encoding the frames into PNG format and subsequently feeding them into \verb|ffmpeg|, a video encoding utility. This approach ensures background processing, minimizing the impact on the engine's performance.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End:
