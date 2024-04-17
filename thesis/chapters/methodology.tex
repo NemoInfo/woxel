@@ -3,19 +3,18 @@
 %%% TeX-master: "../main"
 %%% End:
 
-\part{Methodology}
+\part{Methodology}\label{methodology}
 This section outlines the implementation details of the voxel rendering engine, starting from the selection of programming languages and libraries, going over the architecture of the engine, and diving deep into the data structures and algorithms employed, particularly focusing on VDB for voxel representation and the optimization of ray casting algorithms.
 Finally, this section will discuss the extension of these algorithms to full-fledged ray tracing, allowing for dynamic lightning and glossy material support.
 
-\section{Rust \& wgpu}
+\section{Language and framework}
 \hyphenation{WebGPU}
 
 The voxel rendering engine is built using \textbf{Rust}, a programming language known for its focus on safety, speed, and concurrency\supercite{rustbook}.
 Rust's design emphasizes memory safety without sacrificing performance, making it an excellent choice for high-performance applications like a rendering engine.
 The language's powerful type system and ownership model prevent a wide class of bugs, making it ideal for managing the complex data structures and concurrency challenges inherent in rendering engines. Thanks to this no memory leak or null pointer was ever encoutered throughout the developmenent of this project.
 
-For the graphical backend, the engine utilizes \textbf{wgpu}\supercite{wgpu:doc}, a Rust library that serves as a safe and portable graphics API. wgpu is designed to run on top of various backends, including Vulkan, Metal, DirectX 12, and WebGL, ensuring cross-platform compatibility. This API provides a modern, low-level interface for GPU programming, allowing for fine-grained control over graphics and compute operations. wgpu is aligned with the WebGPU specification\supercite{webgpu:doc}, aiming for broad support across both native and web platforms.
-This choice ensures that the engine can leverage the latest advancements in graphics technology while maintaining portability and performance.
+For the graphical backend, the engine utilizes \textbf{wgpu}\supercite{wgpu:doc}, a Rust library that serves as a safe and portable graphics API. wgpu is designed to run on top of various backends, including Vulkan, Metal, DirectX 12, and WebGL, ensuring cross-platform compatibility. This API provides a modern, low-level interface for GPU programming, allowing for fine-grained control over graphics and compute operations. wgpu is aligned with the WebGPU specification\supercite{webgpu:doc}, aiming for broad support across both native and web platforms, using the WebGPU shading language (wgsl)\supercite{wgsl:doc}. This choice ensures that the engine can leverage the latest advancements in graphics technology while maintaining portability and performance.
 
 The combination of Rust and wgpu offers several advantages for the development of a rendering engine:
 

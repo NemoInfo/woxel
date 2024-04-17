@@ -3,7 +3,7 @@
 %%% TeX-master: "../main"
 %%% End:
 
-\part{Results and Experiments}
+\part{Results and Experiments}\label{results}
 
 \begin{figure}[H]
   \centering
@@ -59,7 +59,7 @@ This section shows some images captured in the rendering engine. All the models 
     (a): RGB mode colors each face based on what axis it is parallel to.
     (b): Ray mode colors each pixel based on how many steps the ray took. The color is interpolated between light blue and red based on how many steps the ray took to go out of bounds or intersect a voxel. Maximum (red) is 200 steps.
     (c): Diffuse mode shows an object with diffuse material lit by sunlight.
-    (d): Glossy mode shows a half glossy (bottom), half diffuse (top) model lit by sunlight. The out of bounds box is colored to discriminate which is face reflected on what surface. The reflection of the middle pod with a sphear on top can be seen in the solar panel in the middle. More reflections can be seen in the solar panels one the left and right.
+    (d): Glossy mode shows a half glossy (bottom), half diffuse (top) model lit by sunlight. The out of bounds box is colored to discriminate which face is reflected on what surface. The reflection of the middle pod with a sphear on top can be seen in the solar panel in the middle. More reflections can be seen in the solar panels one the left and right.
   }
   \label{rendermods}
 \end{figure}
@@ -184,8 +184,17 @@ It is visible in \cref{teacomp} that the most of the improvment that the SDF off
 
 \begin{figure}[H]
   \centering
-  \includesvg[width=0.5\textwidth]{steps.svg}
-  \caption{ray that intersects voxel vs. ray that ``near-misses'' it. The first has 2 axis crossings, the latter has 9.}
+  \begin{subfigure}{0.45\textwidth}
+    \centering
+    \includesvg[width=\textwidth]{steps.svg}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}{0.45\textwidth}
+    \centering
+    \includesvg[width=\textwidth]{steps_sdf.svg}
+    \caption{}
+  \end{subfigure}
+  \caption{ray that intersects voxel vs. ray that ``near-misses'' it. (a) HDDA algorithm; the first has 2 axis crossings, the latter has 9 (b) HDDA+SDF algorithm; the first has 2 axis crossings the latter has 6.}
   \label{steps}
 \end{figure}
 
@@ -210,12 +219,12 @@ The same experiment setup is repeated for the ISS model because it has a lot of 
 
 \begin{figure}[H]
   \centering
-  \begin{subfigure}[b]{0.48\textwidth}
+  \begin{subfigure}[b]{0.45\textwidth}
     \includegraphics[width=\textwidth]{iss_hdda}
     \caption{}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.48\textwidth}
+  \begin{subfigure}[b]{0.45\textwidth}
     \includegraphics[width=\textwidth]{iss_sdf}
     \caption{}
   \end{subfigure}
@@ -226,10 +235,58 @@ These two experiments prove the efficiency of the HDDA+SDF method, it gives more
 
 \subsection{Performance of HDDA+SDF in ray-tracing}
 
-To test the performance of HDDA+SDF when doing ray-tracing the avergae milliseconds per frame will be recorded
+To test the performance of HDDA+SDF when doing ray-tracing the average milliseconds per frame will be recorded in a number of scense for both diffuse and glossy materials.
 
-\section{Future work}
+\begin{table}[h]
+  \centering
+  \begin{tabular}{|c||c|c|c|}
+    \hline
+    & bunny & dragon & ISS \\
+    \hline
+    diffuse & 6ms** & 6ms** & 6.5ms \\
+    \hline
+    glossy & 10.2ms & 11.6ms & 14ms \\
+    \hline
+  \end{tabular}
+  \caption{Milliseconds per frame to render each of the models with a diffuse and a glossy material. \\
+    **: Frame rate cap is hit at 165 FPS, this is as good as the ray casting can get on this machine}
+  \label{sdf_test}
+\end{table}
 
-\section{Limitations}
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[width=\textwidth]{bunny_d}
+    \caption{}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[width=\textwidth]{dragon_d}
+    \caption{}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[width=\textwidth]{iss_d}
+    \caption{}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[width=\textwidth]{bunny_g}
+    \caption{}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[width=\textwidth]{dragon_g}
+    \caption{}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[width=\textwidth]{iss_g}
+    \caption{}
+  \end{subfigure}
+  \caption{Diffuse (a)-(c) and Glossy (d)-(f) renderings that produce the data int \cref{sdf_test}. (a) and (d) shows the bunny model, (b)-(e) shows the dragon model, (c) and (f) show the ISS model}
+\end{figure}
 
-\section{Final remarks}
+The diffuse rendering scheme performs really well, with a minimum \acrshort{fps} of 150 on the large ISS model, and capping out for the other two. The glossy material has a minimum FPS of 71 on the largest model. This is with each ray being allowed to be reflected twice. This produces reasonably looking glossy materials, but such a small max ray reflection count can't produce phtotrealistic results. Since scaling up the max ray size is infeasble as the number of rays increases exponetially with it, this is the maximum the engine can handle while staying above 60 FPS.
+
+This shows the HDDA+SDF performs very well with diffuse materials and dynamic lighting at over 150 FPS, and that it is able to accomodate a small ammount of reflections off glossy materials all with around 80 FPS. This means this algorithm is a viable tool for doing real-time ray-tracing.
