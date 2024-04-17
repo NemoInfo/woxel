@@ -8,9 +8,8 @@
 Graphics engines serve as the core software components responsible for rendering visual content in applications ranging from video games to scientific simulations and visual effects in movies.
 Engines abstract the complexities of rendering by providing developers with high-level tools and interfaces to represent digital enviorments.
 
-The evolution of rendering engines over time reflects the advancments in computational techniques and hardware capabilities enabling more realisitic and immersive experiences
+Rendering engines have evolved from the simple wire-frame models of the 1960s to today's complex 3D systems, driven by advancements in computational power and graphical standards\cite{old} like OpenGL introduced in the early 1990s.
 
-[add history]
 \subsection{Primitves}
 At the heart of any graphical engine is the concept of primitives, the simplest forms of graphical objects that the engine can process and render. Primitives are builiding blocks from which more complex shapes and scenes can be constructed.
 
@@ -27,6 +26,8 @@ It converts the 3D scene into a 2D image by projecting vertices onto the screen,
 Over the development of the industry of graphics programming, graphics hardware has become extremely effcient at performing rasterization, making it the standard for video games and interactive applications.
 
 \textbf{Ray-Tracing}, in contrast, simulatesthe path of light as rays travelling through a scene to produce images with realistic lighting, shadows, reflections, and refractions. Ray tracing is computationally intensive but yields higher-quallity images, makeing it favored for applications where visual fidelity is critical. However, recent advancements in hardware have begun to bring real-time ray tracing to interactive applications.
+
+Ray tracing, conceptualized by Arthur Appel in 1968\supercite{appel}, offers photorealistic images by simulating light paths, but its computational intensity limited early use to non-real-time applications. Rasterization, popularized in the 1970s and optimized by GPU advancements, became the standard for real-time graphics, though \emph{recent} hardware innovations are now enabling real-time ray tracing.
 
 \section{Representing voxels}
 To efficiently represent and manipualte voxels in program memory, various data structures can be employed. Each method entails trade-offs between memory usage, access speed and complexity of implementation. Access speed referes to the time complexity of querying the datastructure at an arbitray point in space to retrieve a potential voxel.
@@ -50,7 +51,7 @@ Hierarchical grids introduce complexity in terms of implementation and managemen
 Another sacrifice is access-time, as querying an arbitrary region of space can entail walking down the tree for several levels.
 Nonetheless, for applications requiring large, detailed scenes with a mix of dense and sparse regions, the benefits of hierarchical representations often outweigh these drawbacks. This is why N-trees are frequently used in voxel engines.
 
-[add history]
+The concept of octrees was introduced by Donald Meagher in 1980\supercite{donald} as a means to efficiently manage spatial data in 3D computer graphics. This technique quickly became integral in applications like 3D rendering and geometric modeling, where it revolutionized spatial data optimization by balancing detailed representation with computational efficiency.
 
 \subsection{VDB}
 \newacronym{bpt}{B+tree}{A m-ary tree with a variable but often large number of children per node.}
@@ -126,7 +127,7 @@ This combination is highly flexible and can create highly detailed and intricate
 
 SDF are not without drawbacks, they can be difficult to maintain, and computationally expensive to generate or update. In practice, distance data can't be of arbitrary size, as that distance information comes at the cost of program memory.
 
-[add history]
+SDFs have been used in real-time rendering, usually in a raymarching context, starting in the mid 2000s. In 2007, Valve was using SDFs to render large pixel-size smooth fonts on the GPU in its games\supercite{valve}.
 
 \subsection{Casting a ray on a voxel grid}
 The ray casting methods presented so far do not take advantage of the discrete grid of voxel that this rendering engine is based on. In this section, efficient algorithms that can use the underlying representation of hierarchical voxel grid are presented.
@@ -143,8 +144,6 @@ The Digital Differential Analyzer (\acrshort{dda}) line drawing algorithm does p
 DDA works by breaking down the minimum distance a ray has to travel to intersect a grid line on each axis.
 At each iteration, it steps to the closest grid intersection along the ray.
 
-[add history]
-
 \vspace{0.5cm}
 \phantomsection\label{def:hdda}
 \newacronym{hdda}{HDDA}{Hierarchical \acrshort{dda}, line drawing algorithm described in \cref{def:hdda}}
@@ -153,11 +152,26 @@ At each iteration, it steps to the closest grid intersection along the ray.
 On a hierarchical grid the DDA algorithm can take advantage of the topology of the data structre by stepping through empty larger chunks.
 A ray casted using \acrshort{hdda}, essentially performs DDA at the level in the tree it is currently at.
 
-[add figure]
-[add history]
-
 A version of the HDDA algorithm for the VDB data structure was introduced by Ken Museth in 2014\supercite{vdb2014}.
-
 This algorithm can be highly efficient, large empty areas can be skipped in a single step, drastically reducing the required steps to march a ray.
 
 \section{Summary of simmilar systems}
+\subsection{OpenVDB\supercite{openvdb:doc}}
+
+\begin{quote}
+``OpenVDB is an Academy Award-winning open-source C++ library comprising a novel hierarchical data structure and a suite of tools for the efficient storage and manipulation of sparse volumetric data discretized on three-dimensional grids. It was developed by DreamWorks Animation for use in volumetric applications typically encountered in feature film production and is now maintained by the Academy Software Foundation (ASWF).
+''
+\end{quote}
+
+This is the original library developed by the authors of the VDB paper. It is very well integrated with a range of rendering engines like Blender, Maya and Houdini. OpenVDB is more of a library to interact with the VDB data structure then a rendering engine. It implements highly optimized algorithms for VDB data (e.g. CUDA HDDA).
+
+\subsection{All is Cubes\supercite{cubes}}
+
+\begin{quote}
+``This project is a game engine for worlds made of cubical blocks (“blocky voxels”). The particular features of this engine are that each ordinary block is itself made out of blocks, and all game mechanics are defined by data within the world that can be interactively edited.''
+\end{quote}
+
+This is a voxel rendering engine made on the same backend as this project, Rust and wgpu, however it employs a more standard apprach of rendering, generating triangle meshes from voxel data and performing rasterization.
+
+\subsection{ Unique Contribution of this Project}
+To the best of my knowledge, there is currently no fully operational voxel rendering engine built solely on the VDB data structure. This project aims to fill that gap by developing a comprehensive rendering engine based entirely on VDB, leveraging its capabilities to handle complex and detailed volumetric data efficiently. Unlike other systems, which may integrate VDB as one of many components or use it for specific functions, this engine is designed to utilize VDB as the core framework for all rendering tasks. This distinction sets the project apart, offering a new perspective and opportunities to explore novel ray-tracing techniques.
