@@ -5,53 +5,53 @@
 
 \part{Background and Literature Review}\label{backgorund}
 \section{Rendering engines}
-Graphics engines serve as the core software components responsible for rendering visual content in applications ranging from video games to scientific simulations and visual effects in movies.
-Engines abstract the complexities of rendering by providing developers with high-level tools and interfaces to represent digital enviorments.
+Graphics engines are the core software components responsible for rendering visual content in applications ranging from video games to scientific simulations and movie visual effects.
+Engines abstract the complexities of rendering by providing developers with high-level tools and interfaces to represent digital environments.
 
 Rendering engines have evolved from the simple wire-frame models of the 1960s to today's complex 3D systems, driven by advancements in computational power and graphical standards\cite{old} like OpenGL introduced in the early 1990s.
 
 \subsection{Primitves}
-At the heart of any graphical engine is the concept of primitives, the simplest forms of graphical objects that the engine can process and render. Primitives are builiding blocks from which more complex shapes and scenes can be constructed.
+At the heart of any graphical engine is the concept of primitives, the simplest forms of graphical objects that the engine can process and render. Primitives are building blocks from which more complex shapes and scenes can be constructed.
 
-\textbf{Polygons}, particullary triangles, are the most commonly used primitives in 3D graphics. This is owed to their simplicity and flexibility, allowing the construction of virtually any 3D shape through \emph{tesselation}. Polygonal meshes define the surfaces of objects in a scene, with each vertex of a polygon typically associated with additional information such as color, texture coordinates, and normal vectors for lighting calculations.
+\textbf{Polygons}, particularly triangles, are the most commonly used primitives in 3D graphics. This is owed to their simplicity and flexibility, allowing the construction of virtually any 3D shape through \emph{tesselation}. Polygonal meshes define the surfaces of objects in a scene, with each polygon vertex typically associated with additional information such as colour, texture coordinates, and normal vectors for lighting calculations.
 
-\textbf{Voxels} represent a different approach to defining 3D shapes, they are essentially three-dimensional pixels. Where polygons define surfaces, voxels establish volume, with each voxel being able to contain color and density information.
-This charactheristic makes voxels particuallry well-suited for rendering scenes with materials that have intricate internal structures, such as fog, smoke, fire and fluids.
+\textbf{Voxels} represent a different approach to defining 3D shapes; they are essentially three-dimensional pixels. Where polygons define surfaces, voxels establish volume, with each voxel potentially containing colour and density information.
+This characteristic makes voxels particularly well-suited for rendering scenes with materials that have intricate internal structures, such as fog, smoke, fire, and fluids.
 
 \subsection{Ray-tracing vs. Rasterization}
-Rendering engines can utilise two main rendering techniques for rendering scenes: ray tracing and rasterization, both having their advantages and trade-offs.
+Rendering engines can utilise two main rendering techniques for rendering scenes: ray tracing and rasterisation. Both have advantages and trade-offs.
 
-\textbf{Rasterization} is the most widespread technique  used in real-time applications.
-It converts the 3D scene into a 2D image by projecting vertices onto the screen, filling in pixels that make up polygons, and applying textures and lighting.
-Over the development of the industry of graphics programming, graphics hardware has become extremely effcient at performing rasterization, making it the standard for video games and interactive applications.
+\textbf{Rasterization} is the most widespread technique used in real-time applications.
+It converts the 3D scene into a 2D image by projecting vertices onto the screen, filling in pixels that makeup polygons, and applying textures and lighting.
+Over the development of the graphics programming industry, graphics hardware has become extremely efficient at performing rasterisation, making it the standard for video games and interactive applications.
 
-\textbf{Ray-Tracing}, in contrast, simulatesthe path of light as rays travelling through a scene to produce images with realistic lighting, shadows, reflections, and refractions. Ray tracing is computationally intensive but yields higher-quallity images, makeing it favored for applications where visual fidelity is critical. However, recent advancements in hardware have begun to bring real-time ray tracing to interactive applications.
+\textbf{Ray-Tracing}, in contrast, simulates the path of light as rays travelling through a scene to produce images with realistic lighting, shadows, reflections, and refractions. Ray tracing is computationally intensive but yields higher-quality images, making it favoured for applications where visual fidelity is critical. However, recent advancements in hardware have begun to bring real-time ray tracing to interactive applications.
 
-Ray tracing, conceptualized by Arthur Appel in 1968\supercite{appel}, offers photorealistic images by simulating light paths, but its computational intensity limited early use to non-real-time applications. Rasterization, popularized in the 1970s and optimized by GPU advancements, became the standard for real-time graphics, though \emph{recent} hardware innovations are now enabling real-time ray tracing.
+Ray tracing, conceptualised by Arthur Appel in 1968\supercite{appel}, offers photorealistic images by simulating light paths, but its computational intensity limited early use to non-real-time applications. Rasterisation, popularised in the 1970s and optimised by GPU advancements, became the standard for real-time graphics, though \emph{recent} hardware innovations are now enabling real-time ray tracing.
 
 \section{Representing voxels}
-To efficiently represent and manipualte voxels in program memory, various data structures can be employed. Each method entails trade-offs between memory usage, access speed and complexity of implementation. Access speed referes to the time complexity of querying the datastructure at an arbitray point in space to retrieve a potential voxel.
+Various data structures can be employed to represent and manipulate voxels in program memory efficiently. Each method entails trade-offs between memory usage, access speed, and implementation complexity. Access speed refers to the time complexity of querying the data structure at an arbitrary point in space to retrieve a potential voxel.
 
 \subsection{Voxel grids}
-A voxel grid is the most straightforwad and intuitive approach to representing volumetric data. The 3D space is divided into a regular grid of voxels, each holding information such as color, material properties, or density. This method provides direct $O(1)$ access to voxel data.
+A voxel grid is the most straightforward and intuitive approach to representing volumetric data. The 3D space is divided into a regular grid of voxels, each holding information such as colour, material properties, or density. This method provides direct $O(1)$ access to voxel data.
 
-However, this simplicity comes at a signficant disatvantage: memory consumption.
-As the bounding volume or the level of detail of the of the scene increases, the memory required to store the voxel grows by $O(N^{3})$.
+However, this simplicity comes at a significant disadvantage: memory consumption.
+As the bounding volume or the level of detail of the scene increases, the memory required to store the voxel grows by $O(N^{3})$.
 Additionally, empty space can occupy a majority of the memory space.
-For example, consider a scene with two voxels that are a million units appart in all axes.
-A voxel grid would have to store all the empty voxels inbetween; $10^{18}$ memory units reserved, 2 of which carry usefull data.
+For example, consider a scene with two voxels a million units apart in all axes.
+A voxel grid would have to store all the empty voxels in-between; $10^{18}$ memory units reserved, 2 of which carry useful data.
 This limitation makes the naive voxel grids impractical for large or highly detailed scenes.
 
 \subsection{Hierarchical voxel grids (N-trees)}
-To mitigate this issues, hierarchical grids, such as octrees, are employed. An octree is a tree data structure where each node represents a cubic portion of 3D space and has up to eight children. This division continues recursively, allowing for varying levels of detail within the scene: larger volumes are represented by higher-level nodes, while finer details are captured in lowere levels.
+Hierarchical grids, such as octrees, are employed to mitigate these issues. An octree is a tree data structure where each node represents a cubic portion of 3D space and has up to eight children. This division continues recursively, allowing for varying levels of detail within the scene: larger volumes are represented by higher-level nodes, while finer details are captured in lower levels.
 
-The primary advantage of using an octree is spatial efficiency. Regions of the space that are empty or contain uniform data can be represented by a single node, significantly reducing the memory footprint. Furthermore, octrees facilitate efficient querying operations, such as collision detection and ray tracing, by allowing the algorithm to quickly discard large empty or irrelevant regions of space.
+The primary advantage of using an octree is spatial efficiency. Regions of the space that are empty or contain uniform data can be represented by a single node, significantly reducing the memory footprint. Furthermore, octrees facilitate efficient querying operations, such as collision detection and ray tracing, by allowing the algorithm to discard large empty or irrelevant regions of space quickly.
 
-Hierarchical grids introduce complexity in terms of implementation and management. Operations such as updating the structure or balancing the tree to ensure efficient access can be more challenging compared to uniform grids.
-Another sacrifice is access-time, as querying an arbitrary region of space can entail walking down the tree for several levels.
-Nonetheless, for applications requiring large, detailed scenes with a mix of dense and sparse regions, the benefits of hierarchical representations often outweigh these drawbacks. This is why N-trees are frequently used in voxel engines.
+Hierarchical grids introduce complexity in terms of implementation and management. Operations such as updating the structure or balancing the tree to ensure efficient access can be more challenging than those of uniform grids.
+Another sacrifice is access time, as querying an arbitrary region of space can entail walking down the tree for several levels.
+Nonetheless, the benefits of hierarchical representations often outweigh these drawbacks for applications requiring large, detailed scenes with a mix of dense and sparse regions. Therefore, N-trees are frequently used in voxel engines.
 
-The concept of octrees was introduced by Donald Meagher in 1980\supercite{donald} as a means to efficiently manage spatial data in 3D computer graphics. This technique quickly became integral in applications like 3D rendering and geometric modeling, where it revolutionized spatial data optimization by balancing detailed representation with computational efficiency.
+Donald Meagher introduced the concept of octrees in 1980\supercite{donald} as a means to manage spatial data in 3D computer graphics efficiently. This technique quickly became integral in applications like 3D rendering and geometric modelling, where it revolutionized spatial data optimization by balancing detailed representation with computational efficiency.
 
 \subsection{VDB}
 \newacronym{bpt}{B+tree}{A m-ary tree with a variable but often large number of children per node.}
@@ -64,84 +64,84 @@ It exploits spatial coherency of time-varying data to separately and compactly e
 VDB models a virtually infinite 3D index space that allows for cache-coherent and fast data access into sparse volumes of high resolution.
 \end{quote}
 
+At its core, VDB functions as a shallow N-tree with a fixed depth, where nodes at different levels vary in size. The top level of this tree structure is managed through a hash map, enabling VDB models to cover extensive index spaces with minimal memory overhead. This design achieves $O(1)$ access performance and effectively stores tiled data across vast spatial regions.
 
-At its core, VDB functions as a shallow N-tree with a fixed depth, where nodes at different levels vary in size. The top level of this tree structure is managed through a hash map, enabling VDB models to cover extensive index spaces with minimal memory overhead. This design achieves $O(1)$ access performance and can effecitively store tiled data across vast spatial regions.
-
-The VDB data structure was introduced along with a several algorithms that make full use of the data structures features, offering significant improvments in techniques for effciently rendering volumetric data. These are some of the benefits VDB have, as detailed in the orginal paper.
+The VDB data structure was introduced along with several algorithms that fully use the data structure's features, offering significant improvements in techniques for efficiently rendering volumetric data. These are some of VDB's benefits, as detailed in the original paper.
 \begin{enumerate}
   \item \emph{Dynamic}. Unlike most sparse volumetric data structures, VDB is developed for both dynamic topology and dynamic values typical of time-dependent numerical simulations and animated volumes.
   \item \emph{Memory effcient}. The dynamic and hierarchical allocation of compact nodes leads to a memory-efficient sparse data structure that allows for extreme grid resolution.
-  \item \emph{Fast random and sequential data access}. VDB supports fast constant-time random data lookup, insertion, and deletion.
-  \item \emph{Virtually infinite}. VDB in concept models an unbounded grid in the sense that the accessible coordinate space is only limited by the bit-precision of the signed coordinates.
+  \item \emph{Fast random and sequential data access}. VDB supports fast, constant-time random data lookup, insertion, and deletion.
+  \item \emph{Virtually infinite}. VDB, in concept, models an unbounded grid in the sense that the accessible coordinate space is only limited by the bit-precision of the signed coordinates.
   \item \emph{Efficient hierarchical algorithms.} The \acrshort{bpt} structure offers the benefits of cache coherency, inherent bounding-volume acceleration, and fast per-branch (versus per-voxel) operations.
 \end{enumerate}
-These benefist make VDB a very compelling data structure to serve as the building block of voxel-based rendering engine.
+These benefits make VDB a very compelling data structure that serves as the building block of a voxel-based rendering engine.
 
 \section{Ray tracing}
-In order to render a scene using ray tracing, camera rays are shot throught the view frustum and into the scene. At each object intersection, part of a ray will get absorbed, reflected and refracted. In order to acheive realistic results, a rendering engine needs to model as many of these light interactions as possible in each frame's time budget.
+To render a scene using ray tracing, camera rays are shot through the view frustum and into the scene. At each object intersection, part of a ray is absorbed, reflected, and refracted. To achieve realistic results, a rendering engine needs to model as many of these light interactions as possible in each frame's time budget.
 
-This section delves into the integration of ray tracing within the graphics pipeline and the methods used to implement it, focusing on casting a ray through a scene.
+This section delves into integrating ray tracing within the graphics pipeline and the methods used to implement it, focusing on casting a ray through a scene.
 
 \subsection{Graphics pipeline}
-The graphics pipeline of a rendering engine is the underlying system of a rendering engine that transforms a 3D scene into a 2D representation that is presented on a screen. While rasterization transforms 3D objects into 2D images through a series of stages(vertex processing, shape assembly, gemoetry shading, rasterization, and fragment processing), the ray tracing pipelines introduces a paradigm shift. It primarly involves calculating the path of rays from the eye (camera) through pixels in a image plane and into the scene, potentially bouncing off surfaces or passing through transparent materials before contributing to the color of a pixel.
+The graphics pipeline of a rendering engine is the underlying system of a rendering engine that transforms a 3D scene into a 2D representation that is then presented on a screen. While rasterization transforms 3D objects into 2D images through a series of stages(vertex processing, shape assembly, geometry shading, rasterization, and fragment processing), the ray tracing pipelines introduce a paradigm shift. It primarily involves calculating the path of rays from the eye (camera) through pixels in an image plane and into the scene, potentially bouncing off surfaces or passing through transparent materials before contributing to the colour of a pixel.
 
-This step of calculating a rays path is central in ray tracing, and as such, the performance of the algorithm that does this calculation is critical.
+Calculating a ray's path is central to ray tracing, so the performance of the algorithm that does this calculation is critical.
 \subsection{Casting a ray}
 Ray casting techniques vary depending on the representation of the 3D world within the rendering engine.
-This section introduces basic ray casting techniques, while subsequent discussions will cover methods specific to voxel-based environments.
+This section introduces basic ray casting techniques, while subsequent discussions cover methods specific to voxel-based environments.
 
 \vspace{0.5cm}
 \textbf{Ray marching}
 
-A straightforward way to represent a 3D enviorment would be a mathematical function of sorts.
-It would take as input the coordinates point and return the propeties of a material at that point (provided there is an object at there).
+A straightforward way to represent a 3D environment would be a mathematical function of sorts.
+It would take the coordinates of a point as input and return the material's properties at that point (provided an object is present).
 
-The first algorithm one might develop when trying to cast a ray through an uknown is scene is ray marching.
+The first algorithm one might develop when trying to cast a ray through an unknown scene is ray marching.
 It involves incrementally stepping along a ray, sampling the scene for collisions at each step.
-The chosen step size needs to be sufficiently small to ensure no detail is missed.
+The chosen step size must be sufficiently small to ensure no detail is missed.
 
-While simple, ray marching is not without its drawbacks, especially in terms of performance.
+While simple, ray marching has drawbacks, especially in terms of performance.
 Considering the need to process millions of pixels per frame within the time constraints of high frame rates, it becomes apparent that iterating a ray tens of thousands of times for every pixel is impractical for modern engines.
 
-This requires the exploration of more advanced techniques to meet the goal of visual realism and performance.
+These constraints require exploring more advanced techniques to meet the goal of visual realism and performance.
 
 \vspace{0.5cm}
 \textbf{Ray casting}
 
-A 3D enviorment could also be represented as a collection of polygons that form meshes.
+A 3D environment could also be represented as a collection of polygons that form meshes.
 
-Ray casting finds the intersection of rays with geometric primitives like (e.g. triangles, circles). This method skips stepping along the ray entirley by making use of the underlying mathematics of interseting lines with polygons.
+Ray casting finds the intersection of rays with geometric primitives (e.g. triangles and circles). This method skips stepping along the ray entirely by using the underlying mathematics of intersecting lines with polygons.
 
-The fundamental issue with this approach is that rays must be checked for an intersection with all the primitives in the scene. Thus computing a single ray intersection has linear complexity in the number of polygons in the scene.
+The fundamental issue with this approach is that rays must be checked for an intersection with all the primitives in the scene. Thus, computing a single ray's intersection has linear complexity in terms of the number of polygons in the scene.
+
 
 \vspace{0.5cm}
 \phantomsection\label{def:sdf}
 \textbf{SDF}
 \newacronym{sdf}{SDF}{Signed distance fields, described in \cref{def:sdf}}
 
-Signed distance fields (\acrshort{sdf}) are a different way of representing the enviorment. An SDF provides the minimum distance from a point in space to the closest surface, allowing the ray marching algorithm to efficiently skip empty space and accurately determine surface intersections.
+Signed distance fields (\acrshort{sdf}) are a different way of representing the environment. An SDF provides the minimum distance from a point in space to the closest surface, allowing the ray marching algorithm to skip empty space and efficiently determine surface intersections.
 With the distance to the nearest surface known, ray marching can be performed by stepping along the ray with that distance, drastically reducing the number of steps needed to cast a ray.
 
 Combining SDF with ray marching offers a powerful method for rendering complex scenes, including soft shadows, ambient occlusion, and volumetric effects.
 This combination is highly flexible and can create highly detailed and intricate visual effects, particularly in procedural rendering and visual effects.
 
-SDF are not without drawbacks, they can be difficult to maintain, and computationally expensive to generate or update. In practice, distance data can't be of arbitrary size, as that distance information comes at the cost of program memory.
+SDFs are not without drawbacks. They can be difficult to maintain and computationally expensive to generate or update. In practice, distance data cannot be of arbitrary size, as that distance information comes at the cost of program memory.
 
-SDFs have been used in real-time rendering, usually in a raymarching context, starting in the mid 2000s. In 2007, Valve was using SDFs to render large pixel-size smooth fonts on the GPU in its games\supercite{valve}.
+SDFs have been used in real-time rendering, usually in a raymarching context, starting in the mid-2000s. In 2007, Valve used SDFs to render large pixel-size smooth fonts on the GPU in its games\supercite{valve}.
 
 \subsection{Casting a ray on a voxel grid}
-The ray casting methods presented so far do not take advantage of the discrete grid of voxel that this rendering engine is based on. In this section, efficient algorithms that can use the underlying representation of hierarchical voxel grid are presented.
+The ray casting methods presented so far do not take advantage of the discrete voxel grid on which this rendering engine is based. This section presents efficient algorithms that can use the underlying representation of a hierarchical voxel grid.
 
 \vspace{0.5cm}
 \phantomsection\label{def:dda}
 \textbf{DDA}
 \newacronym{dda}{DDA}{Digital Differential Analyzer, line drawing algorithm described in \cref{def:dda}}
 
-On a discrete voxel grid, basic ray marching can be improved by stepping from voxel to voxel. Because the voxels are the smallest unit of space, a ray can safely step from one to the next, konwing there is nothing else inbetween.
+Basic ray marching can be improved on a discrete voxel grid by stepping from voxel to voxel. Because voxels are the smallest unit of space, a ray can safely step from one to the next, ensuring there is nothing else in between.
 
-The Digital Differential Analyzer (\acrshort{dda}) line drawing algorithm does precisley that, it marches along a ray from voxel to voxel, skipping all space in between.
+The Digital Differential Analyzer (\acrshort{dda}) line drawing algorithm does precisely that; it marches along a ray from voxel to voxel, skipping all space in between.
 
-DDA works by breaking down the minimum distance a ray has to travel to intersect a grid line on each axis.
+DDA works by breaking down the minimum distance a ray travels to intersect a grid line on each axis.
 At each iteration, it steps to the closest grid intersection along the ray.
 
 \vspace{0.5cm}
@@ -149,13 +149,13 @@ At each iteration, it steps to the closest grid intersection along the ray.
 \newacronym{hdda}{HDDA}{Hierarchical \acrshort{dda}, line drawing algorithm described in \cref{def:hdda}}
 \textbf{HDDA}
 
-On a hierarchical grid the DDA algorithm can take advantage of the topology of the data structre by stepping through empty larger chunks.
-A ray casted using \acrshort{hdda}, essentially performs DDA at the level in the tree it is currently at.
+On a hierarchical grid, the DDA algorithm can take advantage of the data structure's topology by stepping through empty, larger chunks.
+A ray cast using \acrshort{hdda} essentially performs DDA at the level in the tree it is currently at.
 
-A version of the HDDA algorithm for the VDB data structure was introduced by Ken Museth in 2014\supercite{vdb2014}.
-This algorithm can be highly efficient, large empty areas can be skipped in a single step, drastically reducing the required steps to march a ray.
+Ken Museth introduced a version of the HDDA algorithm for the VDB data structure in 2014\supercite{vdb2014}.
+This algorithm can be highly efficient; large empty areas can be skipped in a single step, drastically reducing the required steps to march a ray.
 
-\section{Summary of simmilar systems}
+\section{Summary of similar systems}
 \subsection{OpenVDB\supercite{openvdb:doc}}
 
 \begin{quote}
@@ -163,7 +163,7 @@ This algorithm can be highly efficient, large empty areas can be skipped in a si
 ''
 \end{quote}
 
-This is the original library developed by the authors of the VDB paper. It is very well integrated with a range of rendering engines like Blender, Maya and Houdini. OpenVDB is more of a library to interact with the VDB data structure then a rendering engine. It implements highly optimized algorithms for VDB data (e.g. CUDA HDDA).
+This voxel rendering engine is made on the same backend as this project, Rust and wgpu. However, it employs a more standard approach to rendering, generating triangle meshes from voxel data and performing rasterization.
 
 \subsection{All is Cubes\supercite{cubes}}
 
@@ -174,4 +174,4 @@ This is the original library developed by the authors of the VDB paper. It is ve
 This is a voxel rendering engine made on the same backend as this project, Rust and wgpu, however it employs a more standard apprach of rendering, generating triangle meshes from voxel data and performing rasterization.
 
 \subsection{ Unique Contribution of this Project}
-To the best of my knowledge, there is currently no fully operational voxel rendering engine built solely on the VDB data structure. This project aims to fill that gap by developing a comprehensive rendering engine based entirely on VDB, leveraging its capabilities to handle complex and detailed volumetric data efficiently. Unlike other systems, which may integrate VDB as one of many components or use it for specific functions, this engine is designed to utilize VDB as the core framework for all rendering tasks. This distinction sets the project apart, offering a new perspective and opportunities to explore novel ray-tracing techniques.
+To the best of my knowledge, there is currently no fully operational voxel rendering engine built solely on the VDB data structure. This project aims to fill that gap by developing a comprehensive rendering engine based entirely on VDB, leveraging its capabilities to efficiently handle complex and detailed volumetric data. Unlike other systems, which may integrate VDB as one of many components or use it for specific functions, this engine is designed to utilize VDB as the core framework for all rendering tasks. This distinction sets the project apart, offering a new perspective and opportunities to explore novel ray-tracing techniques.

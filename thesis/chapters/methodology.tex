@@ -4,7 +4,7 @@
 %%% End:
 
 \part{Methodology}\label{methodology}
-This section outlines the implementation details of the voxel rendering engine, starting from the selection of programming languages and libraries, going over the architecture of the engine, and diving deep into the data structures and algorithms employed, particularly focusing on VDB for voxel representation and the optimization of ray casting algorithms.
+This section outlines the implementation details of the voxel rendering engine, starting with the selection of programming languages and libraries, reviewing the engine's architecture, and diving deep into the data structures and algorithms employed. It particularly focuses on VDB for voxel representation and the optimization of ray-casting algorithms.
 Finally, this section will discuss the extension of these algorithms to full-fledged ray tracing, allowing for dynamic lightning and glossy material support.
 
 \section{Language and framework}
@@ -12,33 +12,38 @@ Finally, this section will discuss the extension of these algorithms to full-fle
 
 The voxel rendering engine is built using \textbf{Rust}, a programming language known for its focus on safety, speed, and concurrency\supercite{rustbook}.
 Rust's design emphasizes memory safety without sacrificing performance, making it an excellent choice for high-performance applications like a rendering engine.
-The language's powerful type system and ownership model prevent a wide class of bugs, making it ideal for managing the complex data structures and concurrency challenges inherent in rendering engines. Thanks to this no memory leak or null pointer was ever encoutered throughout the developmenent of this project.
+The language's powerful type system and ownership model prevent a wide range of bugs, making it ideal for managing the complex data structures and concurrency challenges inherent in rendering engines. Thanks to this, no memory leak or null pointer was ever encountered throughout the development of this project.
 
-For the graphical backend, the engine utilizes \textbf{wgpu}\supercite{wgpu:doc}, a Rust library that serves as a safe and portable graphics API. wgpu is designed to run on top of various backends, including Vulkan, Metal, DirectX 12, and WebGL, ensuring cross-platform compatibility. This API provides a modern, low-level interface for GPU programming, allowing for fine-grained control over graphics and compute operations. wgpu is aligned with the WebGPU specification\supercite{webgpu:doc}, aiming for broad support across both native and web platforms, using the WebGPU shading language (wgsl)\supercite{wgsl:doc}. This choice ensures that the engine can leverage the latest advancements in graphics technology while maintaining portability and performance.
+For the graphical backend, the engine utilizes \textbf{wgpu}\supercite{wgpu:doc}, a Rust library that serves as a safe and portable graphics API. wgpu is designed to run on various backends, including Vulkan, Metal, DirectX 12, and WebGL, ensuring cross-platform compatibility. This API provides a modern, low-level interface for GPU programming, allowing for fine-grained control over graphics and compute operations. wgpu is aligned with the WebGPU specification\supercite{webgpu:doc}, aiming for broad support across both native and web platforms, using the WebGPU shading language (wgsl)\supercite{wgsl:doc}. This choice ensures that the engine can leverage the latest advancements in graphics technology while maintaining portability and performance.
 
 The combination of Rust and wgpu offers several advantages for the development of a rendering engine:
 
 \begin{enumerate}
-  \item \emph{Safety and Performance:} Rust’s focus on safety, coupled with wgpu's design, minimizes the risk of memory leaks and undefined behaviors, common issues in high-performance graphics programming. This is thanks to Rust's idea of zero-cost abstractions.
+  \item \emph{Safety and Performance:} Rust's focus on safety, coupled with wgpu's design, minimizes the risk of memory leaks and undefined behaviours, common issues in high-performance graphics programming. This added safety is thanks to Rust's idea of zero-cost abstractions.
 
   \item \emph{Cross-Platform Compatibility:} With wgpu, the engine is not tied to a specific platform or graphics API, enhancing its usability across different operating systems and devices.
 
-  \item \emph{Future-Proofing:} wgpu's adherence to the WebGPU specification ensures that the engine is built on a forward-looking graphics API, designed to be efficient, powerful, and broadly supported. It also allows the future option of supporting web platforms, once browsers adopt WebGPU more throughly.
+  \item \emph{Future-Proofing:} wgpu's adherence to the WebGPU specification ensures that the engine is built on a forward-looking graphics API designed to be efficient, powerful, and broadly supported. It also allows the future option of supporting web platforms once browsers adopt WebGPU more thoroughly.
 
-  \item \emph{Concurrency:} Rust’s advanced concurrency features enable the engine to efficiently utilize multi-core processors, crucial for the heavy computational demands of rendering pipelines.
+  \item \emph{Concurrency:} Rust's advanced concurrency features enable the engine to efficiently utilize multi-core processors, crucial for the heavy computational demands of rendering pipelines.
 \end{enumerate}
 
-These technical choices form the foundation upon which the voxel rendering engine is constructed. Following this, the engine's architecture is designed to take full advantage of Rust's performance and safety features and wgpu's flexible, low-level graphics capabilities, setting the stage for the implementation of advanced voxel representation techniques and optimized ray tracing algorithms.
-
+These technical choices form the foundation for building the voxel rendering engine. Following this, the engine's architecture is designed to take full advantage of Rust's performance and safety features and wgpu's flexible, low-level graphics capabilities, setting the stage for implementing advanced voxel representation techniques and optimized ray tracing algorithms.
 
 \section{Engine architecture}
 
-The engine's operation is centered around an event-driven main loop that blocks the main thread.
-This loop processes various events, ranging from keyboard inputs to redraw requests, and updates the window, context, and scene accordingly, routing each event to it's corresponding handler.
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.8\linewidth]{architecture}
+  \caption{Data flow from \texttt{.vdb} object file to rendering an image on the screen}.
+\end{figure}
+
+The engine's operation centres around an event-driven main loop that blocks the main thread.
+This loop processes various events, ranging from keyboard inputs to redraw requests, and updates the window, context, and scene accordingly, routing each event to its corresponding handler.
 
 \begin{figure}[H]
   \centering
-  \includesvg[width=0.5\linewidth]{engine_1}
+  \includesvg[width=0.8\linewidth]{engine_1}
   \caption{Engine event-loop diagram. Dotted arrows are implemented in \texttt{winit} crate. Black lines represent the flow of events. The arrow line represents the main render function called on the GPU context on the scene for the window.}
 \end{figure}
 
@@ -46,11 +51,11 @@ This loop processes various events, ranging from keyboard inputs to redraw reque
 \subsection{Runtime}
 \newacronym{os}{OS}{Operating System}
 \begin{samepage}
-At the engine's core, sits \texttt{Runtime}  structure, which manages the interaction between the it's main components:
+At the engine's core sits \texttt{Runtime}  structure, which manages the interaction between its main components:
 \begin{itemize}
-  \item The \texttt{Window} is a handler to the engine's graphical window. It is used in filtering \acrshort{os} events that relevant to engine, grabbing the cursor and other boilerplate.
+  \item The \texttt{Window} is a handler to the engine's graphical window. It is used in filtering \acrshort{os} events that are relevant to the engine, grabbing the cursor and another boilerplate.
   \item The \texttt{Wgpu Context} holds the creation and application of the rendering pipeline.
-  \item The \texttt{Scene} contains information abput the camera and enviorment as well as a container voxel data structure.
+  \item The \texttt{Scene} contains information about the camera, environment and a container voxel data structure.
 \end{itemize}
 \end{samepage}
 
@@ -72,19 +77,19 @@ impl Runtime {
 \end{lstlisting}
 
 
-For example, window events (e.g. keyboard \& mouse input) generaly modify the scene, like the camera position, and therfore are routed to the \verb|Scene| struct.
+For example, window events (e.g. keyboard \& mouse input) generally modify the scene, like the camera position, and therefore are routed to the \verb|Scene| struct.
 
-Another key event is the \verb|RedrawRequested| event, which signals that a new frame should be rendered. This is routed to the wgpu context to start the rendering pipeline.
+Another key event is the \verb|RedrawRequested| event, which signals that a new frame should be rendered. It is routed to the wgpu context to start the rendering pipeline.
 
-The \verb|RedrawRequested| event is actually emmited in \verb|Runtime|, when it receives the \verb|MainEventsCleared| event, it scheduels the window for a redraw.
+The \verb|RedrawRequested| event is emitted in \verb|Runtime|, and when it receives the \verb|MainEventsCleared| event, it schedules the window for a redraw.
 
 \subsection{Window}
-The \verb|Window| data structure, included in the \textbf{winit}\supercite{winit:doc} crate, handles window creation and management, and provides an interface to the GUI window through an event loop. This event loop is what \verb|Runtime|'s main loop is mounted on.
+The \verb|Window| data structure, included in the \textbf{winit}\supercite{winit:doc} crate, handles window creation and management and provides an interface to the GUI window through an event loop. This event loop is what \verb|Runtime|'s main loop is mounted on.
 
-The interaction between the \verb|Window| and the \verb|Runtime| forms an event-driven workflow. The window emmits events and the runtime manages and distributes these events accordingly, forming a sort of feedback loop.
+The interaction between the \verb|Window| and the \verb|Runtime| forms an event-driven workflow. The window emits events, and the runtime manages and distributes these events accordingly, forming a feedback loop.
 
 \subsection{Scene}\label{scene:def}
-The \verb|Scene| data structe holds information about the enviorment that is being rendered, this includes the model, camera, and engine state.
+The \verb|Scene| data structure holds information about the environment being rendered; this includes the model, camera, and engine state.
 
 \begin{lstlisting}[language=rust,caption={Scene definition},captionpos=b]
 pub struct Scene {
@@ -94,49 +99,48 @@ pub struct Scene {
 }
 \end{lstlisting}
 
-In this section, the camera and satte implementation is covered, the model will be covered in later [add link] when discussing the \acrshort{vdb} implementation.
+This section covers the camera and state implementation, and the model will be covered later \cref{vdb:sec} when discussing the \acrshort{vdb} implementation.
 \newacronym{fps}{FPS}{Frames per second}
 \newacronym{fov}{FOV}{Field of view, explained in \cref{scene:def}, \cref{fov:def}}
 
-\paragraph{State} handles information about the engine state such as cursor state and time synchronising to decouple engine events from the \acrshort{fps} (e.g. camera movement shouldn't be slower at lower FPS).
+\paragraph{State} handles information about the engine state, such as cursor state and time synchronising to decouple engine events from the \acrshort{fps} (e.g. camera movement should not be slower at lower FPS).
 
 \paragraph{Camera} describes all the elements needed to control and represent a camera:
 \begin{enumerate}
-    \item \emph{Eye:} The camera's position in the 3D space, acting as the point from which the scene is observed.
-    \item \emph{Target:} The point in space the camera is looking at, determining the direction the camera is pointed in.
-    \item \emph{Field of View (FOV):} An angle representing the range that is in view. In the implementation, this refers to the FOV on the $Y$ (vertical) axis.\label{fov:def}
-    \item \emph{Aspect ratio:} The ratio between the width and height of the viewport. It esnures that the rendered scene maintains the correct proportions.
+    \item \emph{Eye:} The camera's position in the 3D space acts as the point from which the scene is observed.
+    \item \emph{Target:} The point in space the camera is looking at determines the direction in which the camera is pointed.
+    \item \emph{Field of View (FOV):} An angle representing the range that is in view. It refers to the implementation's FOV on the $Y$ (vertical) axis.\label{fov:def}
+    \item \emph{Aspect ratio:} The ratio between the width and height of the viewport. It ensures that the rendered scene maintains the correct proportions.
 \end{enumerate}
-The eye and target are updated when moving the camera through a \verb|CameraController| struct that handles keyboard and mouse input. Th FOV and aspect ratio are set based on the window proportions, to avoid distortion. The way in which this camera information is used will be detailed in the primitives section [add link] where we dive into what information is actually sent to the GPU in compute shaders.
+The eye and target are updated when moving the camera through a \verb|CameraController| struct that handles keyboard and mouse input. The FOV and aspect ratio are set based on the window proportions to avoid distortion. The way in which this camera information is used will be detailed in the primitives section \cref{gputypes}, where we dive into what information is actually sent to the GPU in compute shaders.
 
 
 \subsection{WgpuContext}
 The \verb|WgpuContext| structure is the backbone of the rendering pipeline in the voxel rendering engine. It contains the necessary components for interfacing with the GPU using the wgpu API, managing resources such as textures, shaders, and buffers, and executing rendering commands.
 
-Broadly, \verb|WgpuContext| has the follwing responsablities:
+Broadly, \verb|WgpuContext| has the following responsibilities:
 \begin{enumerate}
   \item \emph{Initialization:} The constructor sets up the wgpu instance, device, queue, and surface.
         It also configures the surface with the desired format and dimensions, preparing the context for rendering.
   \item \emph{Resource Setup:} The constructor prepares various resources such as textures for the atlas representation of VDB data, uniform buffers for rendering state, and bind groups for shader inputs.
         It also dynamically reads VDB files, processes the data, and updates GPU resources accordingly.
-  \item \emph{Rendering:} The render method handles updating the window surface.
+  \item \emph{Rendering:} The render method updates the window surface.
         It triggers compute shaders for voxel data processing, manages texture and buffer updates, and executes the render pipeline. Additionally, it manages shader hot-reloading, renders the developer GUI and handles screen capture for recording.
 \end{enumerate}
 
 \subsection{Graphichs Pipeline}
-This section provides an overview of the graphics pipline that is initiated at a \verb|RedrawRequest| event.
+This section provides an overview of the graphics pipeline initiated at a \verb|RedrawRequest| event.
 
 \begin{figure}[H]
 \noindent\begin{minipage}[t]{0.65\textwidth}
   \vspace{0.5cm}
-  When the \verb|WgpuContext|'s render method is invoked, it starts by obtaining a reference to the output texture and creates a corresponding view. Following this, a command encoder is initialized to record GPU commands.
+  When the \verb|WgpuContext|'s render method is invoked, it starts by obtaining a reference to the output texture and creates a corresponding view. Following this, a command encoder is initialised to record GPU commands.
 
-  Next, it uses the \verb|FrameDescriptor|, a structure designed to transform scene information (including the model, camera, and engine state), stored on the CPU, into GPU-compatible bindings. This step prepares all necessary bindings for the compute shaders, which then execute the ray-tracing algorithm across distributed workgroups, with the results written to a texture.
+  Next, it uses the \verb|FrameDescriptor|, a structure designed to transform scene information (including the model, camera, and engine state) stored on the CPU into GPU-compatible bindings. This step prepares all necessary bindings for the compute shaders, executing the ray-tracing algorithm across distributed workgroups, with the results written to a texture.
 
-  Once computation is complete, the texture containing the rendered image is prepared for display. This involves creating a vertex shader to generate a full-screen rectangle, onto which the texture is rasterized using fragment shaders, effectively transferring the rendered image to the output texture.
+  Once the computation is complete, the rendered image's texture is prepared for display. This process involves creating a vertex shader to generate a full-screen rectangle, onto which the texture is rasterised using fragment shaders, effectively transferring the rendered image to the output texture.
 
   The final phase involves adding the GUI layer over the rendered scene before presenting the completed output texture on the screen.
-
 \end{minipage}
 \hfill
 \begin{minipage}[t]{0.3\textwidth}
@@ -148,12 +152,12 @@ This section provides an overview of the graphics pipline that is initiated at a
 \end{minipage}
 \end{figure}
 
-\subsection{GPU Types}
-This section covers the \verb|FrameDescriptor| data structe and how it generates GPU bindings from the data in \verb|Scene| which is stored on the CPU.
+\subsection{GPU Types}\label{gputypes}
+This section covers the \verb|FrameDescriptor| data structure and how it generates GPU bindings from the data in \verb|Scene|, which is stored on the CPU.
 
-Virtually the entire ray-tracing algorithm is run in compute shaders. This means all the information about the model, camera, lights, and metadata has to be passed through.
+Virtually the entire ray-tracing algorithm is run in compute shaders, meaning all the information about the model, camera, lights, and metadata must be passed through to the GPU.
 
-The statically sized data i.e. the camera, sunlight and metadata is passed in an uniform buffer. This buffer is assembled inside the \verb|FrameDescriptor| which wraps \verb|ComputeState|.
+The statically sized data, i.e. the camera, sunlight and metadata, is passed in a uniform buffer. This buffer is assembled inside the \verb|FrameDescriptor|, which wraps \verb|ComputeState|.
 
 \begin{lstlisting}[language=rust]
 #[repr(C)]
@@ -171,7 +175,7 @@ pub struct ComputeState {
 }
 \end{lstlisting}
 
-The GPU's uniform binding system has strict requirements regarding the types and sizes of data that can be passed to shaders. Therfore, information must be packed into memory-aligned bytes. This is facilitated by the #[repr(C)] attribute, which organizes the struct's layout to match that of a C struct. The data also needs to be padded to fit the aligment options, for that reason all fields are 16 bytes, even if they carry less information.
+The GPU's uniform binding system has strict requirements regarding the types and sizes of data that can be passed to shaders. Therefore, information must be packed into memory-aligned bytes. This is facilitated by the \#[repr(C)] attribute, which organizes the struct's layout to match that of a C struct. The data also needs to be padded to fit the aligment options, for that reason all fields are 16 bytes, even if they carry less information.
 
 \begin{lstlisting}[language=rust,caption={\texttt{ComputeState} build method that transforms CPU data into GPU-ready data},captionpos=b,
   label={cstate:build}]
@@ -189,16 +193,15 @@ impl ComputeState {
 }
 \end{lstlisting}
 
-The role of \verb|ComputeState| is to translate high level CPU structures onto these low level GPU types. In future sections the function of the structures fields will be detailed thoroughly.
+The role of \verb|ComputeState| is to translate high-level CPU structures onto these low-level GPU types. In future sections, the function of the structure fields will be thoroughly detailed.
 
 \subsection{Camera}
 
-This section explains how the 3D ray-casting camera is implemented. To role of a camera in a ray-tracing engine is to cast rays from the eye of the camera through the middle of the pixels and into the scene.
+This section explains how the 3D ray-casting camera is implemented. In a ray-tracing engine, a camera casts rays from its eye through the middle of the pixels and into the scene.
 
-Fundamentally the role of the camera is to convert points from world space into screen space. To that end, a view projection matrix can be constructed from the cameras properties (eye, target, \acrshort{fov}, aspect ratio) that takes any point in world space and projects it onto camera space.
+Fundamentally, the role of the camera is to convert points from world space into screen space. To that end, a view projection matrix can be constructed from the camera's properties (eye, target, \acrshort{fov}, aspect ratio) that take any point in world space and project it onto camera space.
 
-In order to cast a ray in world space from the eye of the camera through the middle of the pixel and into the scene we need to bring the pixel from screen space into world space. This is the inverse operation to projection, and hence the inverse matrix of the projection matrix is the camera-to-world matrix.
-
+In order to cast a ray in world space from the camera's eye through the middle of the pixel and into the scene, we need to bring the pixel from screen space into world space. This is the inverse operation of projection, and hence, the projection matrix's inverse matrix is the camera-to-world matrix.
 
 \begin{align}
   \bm{d_{s}} = \begin{bmatrix}
@@ -213,7 +216,7 @@ In order to cast a ray in world space from the eye of the camera through the mid
                 \end{bmatrix}
 \end{align}
 \begin{align}
-\intertext{Multypling gives the pixel coordinates in world space}
+\intertext{Multiplying gives the pixel coordinates in world space}
   \bm{d_{w}} =
       \begin{bmatrix}
         x - \frac{\rm{width}}{2} \\
@@ -231,30 +234,30 @@ In order to cast a ray in world space from the eye of the camera through the mid
         (x - \frac{\rm{width}}{2})u_{y} + (\frac{\rm{height}}{2} - y)v_{y} - w_{y}\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}} \\
         (x - \frac{\rm{width}}{2})u_{z} + (\frac{\rm{height}}{2} - y)v_{z} - w_{z}\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}}
       \end{bmatrix}
-\intertext{Which can be re-written by factoring constant terms into $\bm{w'}$:}
+\intertext{Which can be re-written by factoring out constant terms into $\bm{w'}$:}
   \bm{d_{s}} &= x\bm{u} + y*(-\bm{v}) + \bm{w'} \\
   \bm{w'} &= -\bm{u}\frac{\rm{width}}{2} + \bm{v}\frac{\rm{height}}{2} - \bm{w}\frac{h}{2}\tan^{-1}{\frac{\rm{fov}}{2}}
 \end{align}
 
-This form of the ray direction equation is very useful since the vectors $\bm{u}, \bm{v}$ and $\bm{w'}$ can all be computed once per frame, then the equation is applied in compute shaders per pixel. This method is explained in more detail in this article\supercite{camera_rays}.
+This form of the ray direction equation is very useful since the vectors $\bm{u}, \bm{v}$ and $\bm{w'}$ can all be computed once per frame, and then the equation is applied in compute shaders per pixel. This method is explained in more detail in this article\supercite{camera_rays}.
 
 \crefformat{lstlisting}{lst. #2#1#3}
 \Crefformat{lstlisting}{Lst. #2#1#3}
 
-In the implementation, the calculation of these constant vectors is the responsibility of the \verb|ComputeState| data structure; the \verb|build| method (\cref{cstate:build}) takes in a \verb|Camera| specified by its eye, target, \acrshort{fov} and aspect ratio, and computes the view projection matrix, inverts it to get the camera to world matrix, extracts $\bm{u}, \bm{v}$ and $\bm{w}$, then uses the screen's resolution to calculate $\bm{w'}$. It then packs these vectors into 16 byte arrays.
+In the implementation, the calculation of these constant vectors is the responsibility of the \verb|ComputeState| data structure; the \verb|build| method (\cref{cstate:build}) takes in a \verb|Camera| specified by its eye, target, \acrshort{fov} and aspect ratio, and computes the view projection matrix, inverts it to get the camera to world matrix, extracts $\bm{u}, \bm{v}$ and $\bm{w}$, then uses the screen's resolution to calculate $\bm{w'}$. It then packs these vectors into 16-byte arrays.
 
 \subsection{Shaders}
-In this section the role of the three shader stages in the implementation is explained.
+This section explains the role of the three shader stages in the implementation.
 
 \begin{multicols}{2}
-  \paragraph{Compute Shaders} are the first in the pipeline. They are responsible for performing the entire ray-tracing algorihtm. The Compute shader distributes computational power to work groups, which can be thought as independent units of execution that handle different parts of the calculation in parallel.
-  Each work group is made up of multiple threads that can execute concurrently, significantly speeding up the process by allowing multiple computations to occur at the same time.
-  The Compute Shader casts rays from the camera eye through the pixels, intersections with the model determine to a pixels's color based on material properties, and record these results on a 2D texture.
+  \paragraph{Compute Shaders} are the first in the pipeline. They are responsible for performing the entire ray-tracing algorithm. The Compute shader distributes computational power to work groups, which can be considered independent units of execution that handle different parts of the calculation in parallel.
+  Each work group is made up of multiple threads that can execute concurrently, significantly speeding up the process by allowing multiple computations to occur simultaneously.
+  The Compute Shader casts rays from the camera eye through the pixels; intersections with the model determine a pixel's colour based on material properties and record these results on a 2D texture.
 
   \begin{figure}[H]
     \centering
     \includegraphics[width=1.2\linewidth]{compute_shaders}
-    \caption{Compute shader worker casting a camera ray through a pixel. Work groups of size $8\times4\times1$ have split up the screen.}
+    \caption{Compute shader worker casting a camera ray through a pixel. Workgroups of size $8\times4\times1$ have split up the screen.}
   \end{figure}
 \end{multicols}
 \paragraph{Vertex Shaders} follow Compute Shaders in the graphics pipeline. Their main role is to define the vertices of a screen-sized rectangle, which serves as the canvas for overlaying the texture computed in the Compute Shader stage.
@@ -276,28 +279,27 @@ In this section the role of the three shader stages in the implementation is exp
 \subsection{GUI}
 \newacronym{gui}{GUI}{Graphical User Interface}
 
-This section covers the implementation of the \acrshort{gui} that allows the scene to active model to be changed, lighting to be modified, but also provides usefull developer metrics like ms/frame and other benchmarks.
+This section covers the implementation of the \acrshort{gui} that allows the scene to active model to be changed and lighting to be modified, but also provides helpful developer metrics like ms/frame and other benchmarks.
 
 The GUI is managed using the \verb|egui| crate\supercite{egui:doc}.
-\verb|egui| is an immediate\supercite{im_gui} mode GUI library, which contrasts with traditional retained mode GUI frameworks\supercite{im_vs_rt}.
+\verb|egui| is an immediate\supercite{im_gui} mode GUI library, which contrasts with traditional retained-mode GUI frameworks\supercite{im_vs_rt}.
 
-In immediate mode, GUI elements are redrawn every frame and only exist while the code that declares them is running. This approach makes \verb|egui| flexible and responsive, as it allows for quick updates and changes without needing to manage a complex state or object hierarchy.
+In immediate mode, GUI elements are redrawn every frame and only exist while the code that declares them is running. This approach makes \verb|egui| flexible and responsive, allowing quick updates and changes without needing to manage a complex state or object hierarchy.
 
 The GUI code is run as part of the graphics pipeline in the following steps:
 \begin{enumerate}
-\item \emph{Start Frame:} Each frame begins with a start-up phase where \verb|egui| prepares to receive the definition of the GUI elements. This setup includes handling events from the previous frame, resetting state as necessary, and preparing to collect new user inputs.
+\item \emph{Start Frame:} Each frame begins with a start-up phase where \verb|egui| prepares to receive the definition of the GUI elements. This setup includes handling events from the previous frame, resetting the state as necessary, and preparing to collect new user inputs.
 
-\item \emph{Define GUI Elements:} The application defines its GUI elements by calling functions on an \verb|egui| context object. These functions create widgets such as buttons, sliders, and text fields dynamically, based on the current state and user interactions. This step is where the immediate mode shines, as changes to the GUI's state are made directly in response to user actions, without requiring a separate update phase.
+\item \emph{Define GUI Elements:} The application defines its GUI elements by calling functions on an \verb|egui| context object. These functions dynamically create widgets such as buttons, sliders, and text fields based on the current state and user interactions. This step is where the immediate mode shines, as changes to the GUI's state are made directly in response to user actions without requiring a separate update phase.
 
-\item \emph{End Frame:} After all GUI elements are defined, the frame ends with \verb|egui| rendering all the GUI components onto the screen. During this phase, \verb|egui| computes the final positions and appearances of all elements based on interactions and the layout rules provided.
+\item \emph{End Frame:} After all GUI elements are defined, the frame ends with \verb|egui|, rendering all the GUI components onto the screen. During this phase, \verb|egui| computes all elements' final positions and appearances based on interactions and the layout rules provided.
 
-\item \emph{Integration with Graphics Pipeline:} The GUI is overlaid on the application using a texture that \verb|egui| outputs. This texture is then drawn over the application window using a simple full-screen quad as in the previous section.
+\item \emph{Integration with Graphics Pipeline:} The GUI is overlaid on the application using a texture that \verb|egui| outputs. As in the previous section, this texture is drawn over the application window using a simple full-screen quad.
 \end{enumerate}
 
-[maybe add screen shot?]
 \subsection{Recording}
 
-The engine includes an integrated screen recorder designed to efficiently capture screen footage without compromising the frame rate. Unlike external tools such as OBS, which must capture screen output externally and can be slow due to their inability to access application internals, this engine captures the output texture directly before it is displayed on the screen. This method significantly reduces the time required for capture, giving smoother results, and keeping the frame rate high.
+The engine includes an integrated screen recorder designed to efficiently capture screen footage without compromising the frame rate. Unlike external tools such as OBS, which must capture screen output externally and can be slow due to their inability to access application internals, this engine captures the output texture directly before it is displayed on the screen. This method significantly reduces the time required for capture, giving smoother results and keeping the frame rate high.
 
 \begin{figure}[H]
   \centering
@@ -305,9 +307,4 @@ The engine includes an integrated screen recorder designed to efficiently captur
   \caption{Producer-Consumer pattern of screen recording implementation}
 \end{figure}
 
-The key aspect of this process is to ensure that texture transfer and video encoding are handled asynchronously on a separate thread. This is done using a Producer-Consumer pattern, where the main thread acts as the producer. It periodically places frames into a blocking queue. From this queue, an encoding thread, acting as the consumer, retrieves and processes the frames. This includes encoding the frames into PNG format and subsequently feeding them into \verb|ffmpeg|, a video encoding utility. This approach ensures background processing, minimizing the impact on the engine's performance.
-
-%%% Local Variables:
-%%% mode: latex
-%%% TeX-master: "../main"
-%%% End:
+This process's key aspect is ensuring that texture transfer and video encoding are handled asynchronously on a separate thread. This is done using a Producer-Consumer pattern, where the main thread acts as the producer. It periodically places frames into a blocking queue. From this queue, an encoding thread, acting as the consumer, retrieves and processes the frames, encoding them into PNG format and feeding them into \verb|ffmpeg|, a video encoding utility. This approach ensures background processing, minimizing the impact on the engine's performance.

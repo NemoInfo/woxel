@@ -253,6 +253,8 @@ To test the performance of HDDA+SDF when doing ray-tracing the average milliseco
   \label{sdf_test}
 \end{table}
 
+The diffuse rendering scheme performs really well, with a minimum \acrshort{fps} of 150 on the large ISS model, and capping out for the other two. The glossy material has a minimum FPS of 71 on the largest model. This is with each ray being allowed to be reflected twice. This produces reasonably looking glossy materials, but such a small max ray reflection count can't produce phtotrealistic results. Since scaling up the max ray size is infeasble as the number of rays increases exponetially with it, this is the maximum the engine can handle while staying above 60 FPS.
+
 \begin{figure}[H]
   \centering
   \begin{subfigure}[b]{0.3\textwidth}
@@ -286,7 +288,5 @@ To test the performance of HDDA+SDF when doing ray-tracing the average milliseco
   \end{subfigure}
   \caption{Diffuse (a)-(c) and Glossy (d)-(f) renderings that produce the data int \cref{sdf_test}. (a) and (d) shows the bunny model, (b)-(e) shows the dragon model, (c) and (f) show the ISS model}
 \end{figure}
-
-The diffuse rendering scheme performs really well, with a minimum \acrshort{fps} of 150 on the large ISS model, and capping out for the other two. The glossy material has a minimum FPS of 71 on the largest model. This is with each ray being allowed to be reflected twice. This produces reasonably looking glossy materials, but such a small max ray reflection count can't produce phtotrealistic results. Since scaling up the max ray size is infeasble as the number of rays increases exponetially with it, this is the maximum the engine can handle while staying above 60 FPS.
 
 This shows the HDDA+SDF performs very well with diffuse materials and dynamic lighting at over 150 FPS, and that it is able to accomodate a small ammount of reflections off glossy materials all with around 80 FPS. This means this algorithm is a viable tool for doing real-time ray-tracing.
