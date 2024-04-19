@@ -9,13 +9,15 @@ The VDB (Volumetric Dynamic B-tree) is an advanced data structure designed to ef
 
 VDBs are sparse, shallow trees with a fixed depth but expandable breadth capable of covering a virtually infinite spatial domain. This design enables the VDB to efficiently manage large and complex datasets by adjusting the level of detail dynamically and minimising memory usage.
 
+At the heart of the data structure are its three types of nodes: internal root and leaf. The VDB data structure is inherently general; each of the nodes' sizes can be modified depending on the application. However, in practice, only one specialisation of the VDB structure is used: the VDB543. This choice was made because the authors of the original paper\supercite{vdb2013} analysed a suite of possible shapes and sizes, and this configuration of VDB is the most balanced between performance and memory footprint for most practical applications.
+
 \begin{figure}[H]
   \centering
+  \vspace{-1cm}
   \includegraphics[width=\linewidth]{vdb}
+  \vspace*{-2cm}
   \caption{2D \& 1D slices of the VDB data structure representing three-quarters of a circle. Top left: 2D dense representation of the circle. Top right: 2D sparse representation of the VDB. Bottom left: Sparse representation of the 1D vdb. Usually, VDB nodes have many more child nodes, which would make it harder to visualise; hence, a smaller version of VDB is shown. This figure is an augmented version of the one in the original paper\supercite{vdb2013}}
 \end{figure}
-
-At the heart of the data structure are its three types of nodes: internal root and leaf. The VDB data structure is inherently general; each of the nodes' sizes can be modified depending on the application. However, in practice, only one specialisation of the VDB structure is used: the VDB543. This choice was made because the authors of the original paper\supercite{vdb2013} analysed a suite of possible shapes and sizes, and this configuration of VDB is the most balanced between performance and memory footprint for most practical applications.
 
 \paragraph{Leaf Nodes} They are the lowest level in the tree structure. They store a 3D cubed grid of side length $2^{\log_{2} D}$ (i.e. only powers of 2). A leaf value in the grid can be a voxel's data, other associated data for empty values (such as SDF information), or an empty value.
 Leaf nodes also store a value mask, a bit array meant to compactly determine whether a value at a specific coordinate in the 3D grid is voxel data or empty.
@@ -24,21 +26,14 @@ In the implementation, the trait \verb|Node| is defined, which gives some associ
 
 \begin{lstlisting}[language=rust,caption={\texttt{Node} trait definition},captionpos=b,label={code:node}]
 pub trait Node {
-    /// LOG2_D of side length
     /// LOG2_D = 3 => `512 = 8 * 8 * 8` values
     const LOG2_D: u64;
     /// Total conceptual LOG2_D node
     const TOTAL_LOG2_D: u64;
     /// Total conceptual LOG2_D of child node
     const CHILD_TOTAL_LOG2_D: u64 = Self::TOTAL_LOG2_D - Self::LOG2_D;
-    /// Side length
-    const DIM: u64 = 1 << Self::LOG2_D;
-    /// Total conceptual dimension
-    const TOTAL_DIM: u64 = 1 << Self::TOTAL_LOG2_D;
     /// Size of this node (i.e. length of data array)
     const SIZE: usize = 1 << (Self::LOG2_D * 3);
-    /// Total conceptual size of node, including child size
-    const TOTAL_SIZE: u64 = 1 << (Self::TOTAL_LOG2_D * 3);
 }
 \end{lstlisting}
 
@@ -134,7 +129,7 @@ It is important to note that all children of an internal node must be of the sam
 \paragraph{Root Node} The root node is a single node at the top of the VDB hierarchy. Unlike typical nodes in a tree data structure, the root node in a VDB does not store data directly but instead serves as an entry point to the tree.
 It contains a hash map indexed by global coordinates, linking to all its child nodes. This setup allows for quick access and updates, as the root node acts as a guide to more detailed data stored deeper in the hierarchy. Because its children nodes are stored by a hash map, it only stores information about space that has information to be stored(unlike an octree, where empty top-level nodes are frequent). The root node's primary role is to organise and provide access to internal nodes.
 
-
+\newpage
 \begin{lstlisting}[language=rust, captionpos=b, caption={
     \texttt{RootNode} definition. \texttt{RootData} is either a pointer to a child or 4 bytes of data for a tile value.
   },label={code:root}]
@@ -346,8 +341,7 @@ impl MaskUniform {
         min_binding_size: None,
       },
       count: None,
-    })
-    .collect::<Vec<_>>()[..];
+    }).collect::<Vec<_>>()[..];
 
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
       entries,
@@ -356,8 +350,6 @@ impl MaskUniform {
   }
 }
 \end{lstlisting}
-
-    With the bind group created and integrated into the pipeline, compute shaders can now access the topology of the data.
 
 \begin{lstlisting}[language=rust, captionpos=b, caption={
     wgsl version of the mask arrays. Each buffer is divided into parts based on the size of the node it tackles. This enables getting all the masks of a node with a particular index by simply indexing them into the mask array. For example, \texttt{kids5[0]} would give the first child mask for the Node5 at index 0.
@@ -379,6 +371,8 @@ var<storage, read> vals3: array<Node3Mask>;
 @group(3) @binding(5)
 var<storage, read> origins: array<vec3<i32>>;
 \end{lstlisting}
+    With the bind group created and integrated into the pipeline, compute shaders can now access the topology of the data.
+
     A key part of this representation is the order in which node masks are given in each particular binding, meaning how the node index in the value mask is related to that same node in the CPU-based data structure. The approach is the same as when reading \texttt{.vdb} files: a depth-first descent of the tree topology. The order of nodes in the GPU VDB representation is the same as the order in which they appear in the file.
 
 

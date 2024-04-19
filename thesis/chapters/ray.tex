@@ -4,25 +4,25 @@
 %%% End:
 
 \section{Ray tracing}
-With the structure of the rendering engine and the primary data structure covered, it is now time to bring everything together construct an image.
-For this a ray tracing algorithm is required, which first needs an algorithm to cast a ray.
-In this section, casting rays and ray-tracing algorithms will be covered, and how these integrate with the VDB data structre to optimize performance.
+With the structure of the rendering engine and the primary data structure covered, it is time to bring everything together to construct an image.
+A ray tracing algorithm is required, first needing an algorithm to cast a ray.
+This section will cover methods for casting rays and ray-tracing algorithms, as well as how these integrate with the VDB data structure to optimise performance.
 
 \subsection{Casting a ray}
-The background section glossed over a suite of ray casting algorithms.
-In this section, the implementation of three such algorithms all building on top of eachother will be detailed: DDA, HDDA and HDDA+SDF.
+The background section glossed over a suite of ray-casting algorithms.
+This section will detail the implementation of three such algorithms, all built on top of each other: DDA, HDDA, and HDDA+SDF.
 
 \subsubsection{DDA}
-\acrshort{DDA} works by ray marching from grid intersection to grid intersection, making sure each voxel is only polled once.
-The starting values are a source point and a normalized irection vector.
+\acrshort{DDA} works by ray marching from grid to grid intersection, ensuring each voxel is only polled once.
+The starting values are a source point and a normalised direction vector.
 \begin{enumerate}
-  \item Initial Position (ipos): The starting position of the ray within the voxel grid, calculated by flooring the source vector. This gives the indices of the voxel grid where the ray starts.
-  \item Delta Distance (deltaDist): This calculates how far the ray must travel in each axis to cross a voxel boundary. It is computed by dividing the length of the direction vector (dir) by each component of the direction vector. This gives the distance the ray travels in each axis per step.
-  \item Step (step): A vector that determines the direction to step through the grid in each axis (i.e., whether to increment or decrement the index in each dimension). It is determined by the sign of the direction vector components.
-  \item Side Distance (sideDist): This vector stores the distance the ray needs to travel to hit the next side of a voxel. It starts with the distance to the first boundary from the source position, adjusted by half a voxel size in the direction of travel to ensure the calculation centers within a voxel.
+  \item Initial Position (ipos): The starting position of the ray within the voxel grid, calculated by flooring the source vector. It gives the indices of the voxel grid where the ray starts.
+  \item Delta Distance (deltaDist): This calculates how far the ray must travel in each axis to cross a voxel boundary. It is computed by dividing the length of the direction vector (dir) by each component of the direction vector, giving the distance the ray travels in each axis per step.
+  \item Step (step): A vector determining the direction to step through the grid in each axis (i.e., whether to increment or decrement the index in each dimension). It is determined by the sign of the direction vector components.
+  \item Side Distance (sideDist): This vector stores the distance the ray needs to travel to hit the next side of a voxel. It starts with the distance to the first boundary from the source position, adjusted by half a voxel size in the direction of travel to ensure the calculation centres within a voxel.
 \end{enumerate}
 
-The core idea of the algorithm is that it precomputes the amount one unit of movment on either axis causes the ray to progress (\texttt{deltaDist}). It then maintains a record of how far the ray has progressed on for each axis, and selects the one for which the ray has moved the least, i.e. the closest boundary intersection.
+The core idea of the algorithm is that it precomputes the amount one unit of movement on either axis causes the ray to progress (\texttt{deltaDist}). It then maintains a record of how far the ray has progressed on each axis and selects the one for which the ray has moved the least, i.e. the closest boundary intersection.
 
 \begin{lstlisting}[language=rust, captionpos=b, caption={\texttt{DDA} algorithm}]
 const MAX_RAY_STEPS: i32 = 64;
@@ -52,46 +52,43 @@ fn cast_ray_dda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 }
 \end{lstlisting}
 
-Specifically at each iteration of the ray marching loop three steps operations are performed:
+Specifically, at each iteration of the ray marching loop, three steps operations are performed:
 \begin{enumerate}
-  \item Voxel Check: At each step, the algorithm checks whether the current voxel (ipos) is occupied by using the getVoxel(ipos) function. If this function returns true, indicating a hit, the loop exits as the ray has intersected a voxel, and its color,adjusted to distinguish between the face on wich the ray hit, is returned.
-  \item Boundary Calculation: Determines which voxel boundary (x, y, or z) will be hit next by comparing the distances in sideDist. The logic here involves comparing each component of sideDist against the others to find the smallest value. This is done using vector comparisons b1 and b2, which yield boolean vectors.
-  \item Update sideDist and ipos: Updates the current side distance and position based on which boundary will be hit next. If the smallest distance is in the x-direction, then the x-component of sideDist and ipos are updated, and similarly for y and z.
+  \item Voxel Check: At each step, the algorithm checks whether the current voxel (ipos) is occupied by using the getVoxel(ipos) function. If this function returns true, indicating a hit, the loop exits as the ray has intersected a voxel, and its colour, adjusted to distinguish between the face on which the ray hit, is returned.
+  \item Boundary Calculation: Determines which voxel boundary (x, y, or z) will be hit next by comparing the distances in sideDist. The logic here involves comparing each component of sideDist against the others to find the smallest value. This is computed using vector comparisons b1 and b2, which are boolean vectors.
+  \item Update sideDist and ipos: Updates the current side distance and position based on which boundary will be hit next. For example, If the smallest distance is in the x-direction, then the x-component of sideDist and ipos are updated.
 \end{enumerate}
-
-With this algorithm implemented it is finally possible to visualize our first voxels.
-[add image]
 
 \subsubsection{HDDA}
 This section covers the Hierarchical DDA specifically tailored for traversing volumetric data represented in a VDB, using the data structure at last. This method is much more effective in handling large and sparse volumetric datasets due to its hierarchical traversal mechanism, which significantly enhances computational efficiency and scalability.
 
-The key idea is to cale the step at each iteration the ray the lowest level of detail at that point. For example, if at a point in an empty Node4, there is no reason not to step directly the side length of a Node4 along an axis, since it is guaranteed that there is no voxel data in that node.
+The key idea is to scale the ray step at each iteration by the lowest level of detail at that point. For example, if at a point in an empty Node4, there is no reason not to step directly the side length of a Node4 along an axis since it is guaranteed that there is no voxel data in that node.
 
 The following is a breakdown of the algorithm in \cref{hdda:code}:
 \paragraph{Initialation}
 \begin{enumerate}
   \item The ray's initial position \texttt{p} is set to the source point src.
   \item The \texttt{step} vector determines the traversal direction in the grid is the non-zero sign of the ray.
-  \item The \texttt{step01} vector is used as a flag to ensure determine wheter the size on agiven axis should be added when calculating step candidates.
-        It essentially discrimates between the cases shown in \cref{hdda:fig}.
+  \item The \texttt{step01} vector is used as a flag to determine whether the size on a given axis should be added when calculating step candidates.
+        It essentially discriminates between the cases shown in \cref{hdda:fig}.
   \item The \texttt{idir} vector represents the inverse of the directional vector.
         \newacronym{fpu}{FPU}{Floating-Point Unit, a coprocessor for handling floating point numbers}
-        It is precomputed to not have to do element-wise division in the body of the loop, since multiplication is faster than division on \acrshort{fpu}.
-  \item The \texttt{mask} has the same role as in standard DDA, it will be used to decied which increment produced the smallest step on the ray.
+        It is precomputed to avoid doing element-wise division in the loop's body since multiplication is faster than division on \acrshort{fpu}.
+  \item The \texttt{mask} has the same role as in standard DDA; it will be used to decide which increment produced the smallest step on the ray.
 \end{enumerate}
-With this initial information the ray can start marching along the VDB.
+With this initial information, the ray can start marching along the VDB.
 
 \begin{figure}[H]
   \centering
   \includesvg[width=\linewidth]{hdda}
   \caption{
-    \texttt{HDDA} iteration. (a): Ray positive in both axes.
-    When a ray direction has a positive component, because of the directionallity of the modulo operation, it must be subtracted from the size of the node to mantain the ray direction.
-    (b): Ray negative both axes. When a ray has a negative compnent, the modulo must simply be inverted since the size is already accounted for. \\
-    Blue and gray vectors are candidate steps at the given iteration, each have their respective components outside the squares.
-    The blue vector is the one that has to be selected, since is the shorter one.
-    The black vector reprsents the modulo size vector. The $\odot$ operation denotes element wise multiplication.
-    Small branching factor is not tipicall of the VDB datastructure, this was chosen purely for visual clarity.
+    \texttt{HDDA} iteration. (a): Ray positive on both axes.
+    When a ray direction has a positive component, because of the directionality of the modulo operation, it must be subtracted from the size of the node to maintain the ray direction.
+    (b): Ray negative on both axes. When a ray has a negative component, the modulo must simply be inverted since the size is already accounted for. \\
+    Blue and grey vectors are candidate steps at the given iteration; each has its components outside the squares.
+    The blue vector has to be selected since it is the shorter one.
+    The black vector represents the modulo-size vector. The $\odot$ operation denotes element-wise multiplication.
+    A small branching factor is not typical of the VDB data structure; this was chosen purely for visual clarity.
   }
   \label{hdda:fig}
 \end{figure}
@@ -99,12 +96,12 @@ With this initial information the ray can start marching along the VDB.
 \paragrapth{Loop} \\
 The ray traversal loop has the following steps:
 \begin{enumerate}
-  \item \textbf{Qeuery the VDB} for the value at the current position. If the value is non-empty or out of bounds return a color for the voxel
+  \item \textbf{Qeuery the VDB} for the value at the current position. If the value is non-empty or out of bounds, return a colour for the voxel
   \item\label{ray:enum1} \textbf{Compute step calculations} scaled by the size of the current level.
-        Compute candidate steps in all 3 axis, choose the minimum and step the ray in that direction
-  \item \textbf{Adjust the position} by a very small factor to make sure it will query the next cell.
-        Since the algorthm deals with points on edges, sampling a point directly on the edge is prone to floating point issues,
-        so the position is nudged by a small amount twards the cell in the direction that was selected at \cref{ray:enum1}.
+        Compute the candidate steps in all three axes, choose the minimum and step the ray in that direction
+  \item \textbf{Adjust the position} by a tiny factor to ensure it will query the next cell.
+        Since the algorithm deals with points on edges, sampling a point directly on edge is prone to float point issues,
+        so the position is nudged by a small amount towards the cell in the direction selected at \cref{ray:enum1}.
 \end{enumerate}
 
 \begin{lstlisting}[language=rust, captionpos=b, caption={\texttt{HDDA} algorithm}, label={hdda:code}]
@@ -143,27 +140,26 @@ fn hdda_ray(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 \end{lstlisting}
 
 \paragraph{Using the VDB}
-At this point we can finally make use if the topology of the VDB data structure.
-The size of the step in HDDA is determined by the level of the lowest node at that point.
-This can be computed by just stepping down the tree until we get either a voxel value value or a node's tile value (a value is meant to mean empty as well here).
-This would work just fine but there is some potential for some further optimisation.
+At this point, we can finally make use of the topology of the VDB data structure.
+The size of the step in HDDA is determined by the lowest node level at that point.
+This can be computed by stepping down the tree until we get either a voxel value or a node's tile value (a value is also meant to mean empty here).
+This works fine, but there is some potential for further optimisation.
 
-Since the HDDA will essintialy step throught neighbouring cells, the majority of the time these neighbouring cells have the same parent (except for cells at the border of the parent's 3D grid).
-When a ray passes through a Node3's, which is reprsents $8\times8\times8$ voxels, assuming no collision, 8 voxel check are expected, at minimum (when the ray passes paralell to either axis).
-For each of these 8 check the lookup in the VDB structure would consist of Going from root node to a Node5 to a Node4 then to a Node3 and then index into its grid.
-This doesn't have to be the case, if the algorithm remembers the chain of nodes from the previous iteration it could simply check if the voxel it needs is in the Node3 it already has,
-and just use that, if not go up to the parent and check again. These cases are the majority of cases. For 8 voxels in a horizontal line 7 out of 8 would be in this case,
-all but the first which would have to go up to the Node4 to get the neighbouring Node3 and then index the voxel.
-This method optimizes lookups for virtually no cost, just using the topology of the datastructure. This kind of idea wouldn;t work in an octree for example, because in an octree all nodes are boundry nodes.
+HDDA usually steps through neighbouring cells, and these neighbouring cells have the same parent (except for cells at the border of the parent's 3D grid).
+When a ray passes through a Node3, which represents $8\times8\times8$ voxels, assuming no collision, eight voxel checks are expected, at minimum (when the ray passes parallel to either axis).
+For each of these eight checks, the lookup in the VDB structure would consist of Going from the root node to a Node5 to a Node4, then to a Node3, and then indexing into its grid.
+However, if the algorithm would remember the chain of nodes from the previous iteration, it could simply check if the voxel it needs is in the Node3 it already has, and use that, if not go up to the parent and check again. These cases are the majority of cases. For eight voxels in a horizontal line, 7 out of 8 would be in this case,
+all but the first, which would have to go up to the Node4 to get the neighbouring Node3 and then index the voxel.
+This method optimises lookups for virtually no cost, just using the data structure's topology. This idea would not work in an octree, for example, because in an octree, all nodes are boundary nodes.
 This is where the grid-like properties of the VDB shine.
 
 In the software implementation, the structure \texttt{VdbBottom} (\cref{hdda:bot}) is constructed, meant to represent the path to the bottom of a query in VDB.
-Along with this data structre the method \texttt{get\_vdb\_bot\_from\_bot} (used in \cref{hdda:code}) is created.
-The method does exactly what was described above, tries get the next value using the nodes of the previous from the bottom up.
+Along with this data structure, the method \texttt{get\_vdb\_bot\_from\_bot} (used in \cref{hdda:code}) is created.
+The method does exactly what was described above: it tries to get the next value using the nodes of the previous one from the bottom up.
 
 \begin{lstlisting}[language=rust, captionpos=b, caption={
     \texttt{VdbBottom} defintion.
-    The structure holds the at 3 parents (or less) that the bottom value has, if the the bottom and wether the the bottom was an empty value, and the color information if it was voxel.
+    The structure holds the three (or fewer) parents that the bottom value has, whether the bottom was an empty value, and the colour information if it was voxel.
   }, label={hdda:bot}]
 struct Parent {
     origin: vec3<i32>,
@@ -178,13 +174,13 @@ struct VdbBottom {
 }
 \end{lstlisting}
 
-This HDDA agorithm is already highly efficient ([add link to results section]), and can redner complex scenes with high voxel counts and dynamic lighting very well, but it always possible to do better.
+This HDDA algorithm is already highly efficient (see \cref{table:2}) and can render complex scenes with high voxel counts and dynamic lighting very well. However, it is always possible to do better.
 
 \subsubsection{HDDA+SDF}
-In this section, the final improvement to the ray casting algorithm is done.
-This can be acheived by bringing together the HDDA algorithm described in the last part with the \acrshort{sdf} data described in \cref{vdb:sdf}.
-The idea is simple, at each level of the hierarchy instead of stepping by one unit in relative space, step as many as the SDF allows.
-With the SDF already computed, modifying the HDDA algorithm is as simple as changing a few lines of code, multiplying th size of the step by the minimum distance.
+This section shows the final improvement to the ray casting algorithm.
+It combines the HDDA algorithm described in the last part with the \acrshort{sdf} data described in \cref{vdb:sdf}.
+The idea is simple: at each level of the hierarchy, instead of stepping by one unit in relative space, step by as many as the SDF allows.
+With the SDF already computed, modifying the HDDA algorithm is as simple as changing a few lines of code and multiplying the step size by the minimum distance.
 
 \begin{lstlisting}[language=rust,caption{HDDA+SDF tweaks}]
 fn hdda(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
@@ -199,23 +195,23 @@ struct VdbBottom {
 }
 \end{lstlisting}
 
-The simple HDDA algorithm would have satisfied the goals and objective set for this project, but this version is even better. At this point, it is time to put these algorithms to the test by adding lights and reflections.
+The simple HDDA algorithm would have satisfied the goals and objectives set for this project, but this version is even better. At this point, it is time to test these algorithms by adding lights and reflections.
 
 \subsection{Sunlight}
-Sunlight can be described by a direction and a color. The idea is to cast a camera rays through the scene and when a ray intersects an object, anoter ray is casted from that point in the direction of the sun.
-If that ray intersects anything else that means the object is in shadow so sunlight doesn't contribute to it's color, otherwise the sunlight hits an object and therfore contributes to its color.
+Sunlight can be described by direction and colour. The idea is to cast camera rays through the scene, and when a ray intersects an object, another ray is cast from that point in the direction of the sun.
+If that ray intersects anything else, the object is in shadow, so sunlight does not contribute to its colour; otherwise, sunlight hits an object and, therefore, contributes to its colour.
 
-An important part of this algorithm is how the contribution of the sunlight to the object's color is calculated.
-A straightforward way would be to add the sunlight color to the color of the object times some intensity coefficient.
-However, the angle at wich the sunlight hits a voxel face is also a key aspect of this calculation. The dot product of the sunlight direction and the surface normal of the object can be used to determine how much sunlight falls on the face of an object.
+An important part of this algorithm is calculating the contribution of sunlight to an object's colour.
+A straightforward way would be to add the sunlight colour to the colour of the object times some intensity coefficient.
+However, the angle at wich the sunlight hits a voxel face is a key aspect of this calculation. The dot product of the sunlight direction and the surface normal of the object can be used to determine how much sunlight falls on the face of an object.
 
 The following model based on the Lambertian Reflectance Formula\supercite{light} is proposed:
 \begin{align*}
-\intertext{\textbf{Ambient Lighting} represents indirect light that is scattered in the environment and illuminates all objects equally.}
+\intertext{\textbf{Ambient Lighting} represents indirect light scattered in the environment and illuminates all objects equally.}
   \vec I_{ambient} &= k_{a} \cdot C_{ambient} \odot \vec C_{surface}
-\intertext{\textbf{Diffuse Lighting} represents light that comes from a the sun and affects surfaces based on their orientation relative to the light source.}
+\intertext{\textbf{Diffuse Lighting} represents the light from the sun and affects surfaces based on their orientation relative to the light source.}
   \vec I_{diffuse} &= k_{d} \cdot (\vec L \cdot \vec N) \cdot \vec C_{sunlight} \odot \vec C_{surface}
-\intertext{When an object is \textbf{in shadow} it does not receive sunlight, so the $I_{diffuse} compnent is ommited$}
+\intertext{When an object is \textbf{in shadow} it does not receive sunlight, so the $I_{diffuse} component is ommited$}
   \vec C_{total} &= \vec I_{ambient} \\
   \vec C_{total} &= k_{a} \cdot C_{ambient} \odot \vec C_{surface}
 \intertext{When an object is \textbf{not in shadow} $I_{diffuse}$ is added to the ambient color}
@@ -231,10 +227,10 @@ The following model based on the Lambertian Reflectance Formula\supercite{light}
   \vec C_{snlight} &= \text{sunlight color}
 \end{align*}
 
-This model has a straitforward software implementation. The function \texttt{hdda\_ray} now returns a custom output type that carries information
-about the result of the ray cast operation such as state (hit, miss or out of steps), the render mode which will be shown in the results and experiments part [add ref],
-the HDDA mask which is used to determine the surface normal of the intersected voxel, and the point of intersection.
-The only difference from the mathematical model above is the useage of the alpha channel of the sun color to encode sunlight strength.
+This model has a straightforward software implementation. The function \texttt{hdda\_ray} now returns a custom output type that carries information
+about the result of the ray cast operation, such as state (hit, miss or out of steps), the render mode, which will be shown in the experiments section \cref{rendermods},
+the HDDA mask used to determine the surface normal of the intersected voxel, and the point of intersection.
+The only difference from the mathematical model above is that the alpha channel of the sun's colour is used to encode sunlight strength.
 
 \begin{lstlisting}[language=rust,caption={Sunlight rendering on diffuse materials}, captionpos=b]
 fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
@@ -263,9 +259,9 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 \end{lstlisting}
 
 \subsection{Glossy Materials}
-Adding glossy materialse requires bouncing the ray off objects recursively. Unlike perfectly diffuse surfaces that scatter light in all directions, glossy surfaces cause reflections that are more directed, often leading to visible specular highlights and clear reflections of the environment.
+Adding glossy materials requires bouncing the rays off objects recursively. Unlike perfectly diffuse surfaces that scatter light in all directions, glossy surfaces cause more directed reflections, often leading to visible specular highlights and clear reflections of the environment.
 
-This requires a more complex approach to ray tracing, which includes handling recursive ray bounces to accurately simulate the reflection phenomena.
+A more complex approach to ray tracing is required, a method that includes handling recursive ray bounces to accurately simulate the reflection phenomena.
 For glossy materials, when a ray intersects the surface, it typically generates at least two additional types of rays:
 \begin{enumerate}
   \item \textbf{Shadow Ray:} This ray is cast towards light sources shown in the previous section.
@@ -276,16 +272,16 @@ For glossy materials, when a ray intersects the surface, it typically generates 
         \end{equation}
 \end{enumerate}
 
-While recursive ray tracing provides a high degree of realism, especially for scenes involving glossy materials, its implementation on GPUs encounters significant challenges. GPUs are not well-suited to handle recursive operations due to their parallel processing architecture. Recursion requires a stack-based memory model, which is more naturally handled by CPUs. Moreover, recursive ray tracing, especially with multiple bounces (reflections), is computationally intensive. Each additional bounce increases the complexity exponentially, making real-time rendering particularly challenging.
+While recursive ray tracing provides a high degree of realism, especially for scenes involving glossy materials, its implementation on GPUs encounters significant challenges. GPUs are not well-suited to handle recursive operations due to their parallel processing architecture. Recursion requires a stack-based memory model, which is more naturally handled by CPUs. Moreover, recursive ray tracing is computationally intensive, especially with multiple bounces (reflections). Each additional bounce increases the complexity exponentially, making real-time rendering particularly challenging.
 
-Nonetheless ``recursive'' ray tracing with a very shallow depth of 2 bounces was implemted. This already brings the maximum numbers of rays that can be casted per to 6.
-So this will serve as more of a stress test of the engine and ray casting algorithms.
+Nonetheless, ``recursive'' ray tracing with a very shallow depth of 2 bounces was implemented. This already brings the maximum numbers of rays that can be casted per to 6.
+This will serve as more of a stress test of the engine and ray-casting algorithms.
 
-The software implmentation considers of chaining the same function but with different names multiple times and setting them up to call each other in sequence.
-The \texttt{ray\_trace} function can call the \texttt{ray\_trace1} function which can call the \texttt{ray\_trace2} all of which can call shadow ray functions.
+The software implementation consists of chaining the same function, copied repeatedly but with different names and setting them up to call each other in sequence.
+The \texttt{ray\_trace} function can call the \texttt{ray\_trace1} function, which can call the \texttt{ray\_trace2}, all of which can call shadow ray functions.
 
-The color model of this for glossy materials develops on the previous one, computing the difuse part of the color the same way but mixing with the reflected color based on a reflectance coefficient $k_{r}$
-The final color returned by the function is a mix of the ambient plus diffuse lighting and the color from the reflected ray, weighted by the reflectivity
+The colour model of this for glossy materials develops on the previous one, computing the diffuse part of the colour the same way but mixing with the reflected colour based on a reflectance coefficient $k_{r}$
+The final colour returned by the function is a mix of the ambient plus diffuse lighting and the colour from the reflected ray, weighted by the reflectivity.
 This mixing accounts for both direct illumination and the effects of reflections from other surfaces.
 
 \begin{lstlisting}[language=rust,caption={Glossy materials color model}, captionpos=b]

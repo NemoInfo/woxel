@@ -144,10 +144,10 @@ struct HDDAout {
 // MATERIAL CONSTANTS
 const k_d: f32 = 0.7;
 const k_a: f32 = 0.3;
-const REFLECTIVITY: f32 = 0.7;
+const REFLECTIVITY: f32 = 0.9;
 const WALL_I: f32 = 0.1;
-const BASE_COLOR: vec3<f32> = vec3(0.4, 0.3, 0.4);
-const AMBIENT_COLOR: vec3<f32> = vec3(0.3, 0.3, 0.3);
+const BASE_COLOR: vec3<f32> = vec3(0.4, 0.2, 0.2);
+const AMBIENT_COLOR: vec3<f32> = vec3(0.4, 0.4, 0.3);
 
 fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let hit: HDDAout = hdda_ray(src, dir);
@@ -207,9 +207,9 @@ fn ray_trace(src: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
                 mcol = BASE_COLOR + I * s.sun_color.xyz;
             }
 
-            if hit.p.y > 0.0 {
-                return mcol;
-            }
+            // if hit.p.y < 0.0 {
+            //     return mcol;
+            // }
 
             // Rr = Ri - 2N(Ri*N)
             let rdir = normalize(dir - 2.0 * N * dot(dir, N));

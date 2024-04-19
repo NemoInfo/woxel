@@ -128,11 +128,11 @@ Broadly, \verb|WgpuContext| has the following responsibilities:
         It triggers compute shaders for voxel data processing, manages texture and buffer updates, and executes the render pipeline. Additionally, it manages shader hot-reloading, renders the developer GUI and handles screen capture for recording.
 \end{enumerate}
 
-\subsection{Graphichs Pipeline}
+\subsection{Graphics Pipeline}
 This section provides an overview of the graphics pipeline initiated at a \verb|RedrawRequest| event.
 
 \begin{figure}[H]
-\noindent\begin{minipage}[t]{0.65\textwidth}
+\noindent\begin{minipage}[t]{0.75\textwidth}
   \vspace{0.5cm}
   When the \verb|WgpuContext|'s render method is invoked, it starts by obtaining a reference to the output texture and creates a corresponding view. Following this, a command encoder is initialised to record GPU commands.
 
@@ -143,7 +143,7 @@ This section provides an overview of the graphics pipeline initiated at a \verb|
   The final phase involves adding the GUI layer over the rendered scene before presenting the completed output texture on the screen.
 \end{minipage}
 \hfill
-\begin{minipage}[t]{0.3\textwidth}
+\begin{minipage}[t]{0.24\textwidth}
   \vspace{-0.5cm}
   \begin{figure}[H]
     \centering
@@ -303,8 +303,10 @@ The engine includes an integrated screen recorder designed to efficiently captur
 
 \begin{figure}[H]
   \centering
-  \includesvg[width=0.5\linewidth]{recording}
+  \includesvg[width=0.6\linewidth]{recording}
   \caption{Producer-Consumer pattern of screen recording implementation}
 \end{figure}
 
 This process's key aspect is ensuring that texture transfer and video encoding are handled asynchronously on a separate thread. This is done using a Producer-Consumer pattern, where the main thread acts as the producer. It periodically places frames into a blocking queue. From this queue, an encoding thread, acting as the consumer, retrieves and processes the frames, encoding them into PNG format and feeding them into \verb|ffmpeg|, a video encoding utility. This approach ensures background processing, minimizing the impact on the engine's performance.
+
+\input{chapters/vdb.tex}
