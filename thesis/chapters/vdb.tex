@@ -16,7 +16,7 @@ At the heart of the data structure are its three types of nodes: internal root a
   \vspace{-1cm}
   \includegraphics[width=\linewidth]{vdb}
   \vspace*{-2cm}
-  \caption{2D \& 1D slices of the VDB data structure representing three-quarters of a circle. Top left: 2D dense representation of the circle. Top right: 2D sparse representation of the VDB. Bottom left: Sparse representation of the 1D vdb. Usually, VDB nodes have many more child nodes, which would make it harder to visualise; hence, a smaller version of VDB is shown. This figure is an augmented version of the one in the original paper\supercite{vdb2013}}
+  \caption[2D and 1D VDB structure]{2D and 1D slices of the VDB data structure representing three-quarters of a circle. Top left: 2D dense representation of the circle. Top right: 2D sparse representation of the VDB. Bottom left: Sparse representation of the 1D vdb. Usually, VDB nodes have many more child nodes, which would make it harder to visualise; hence, a smaller version of VDB is shown. This figure is an augmented version of the one in the original paper\supercite{vdb2013}}
 \end{figure}
 
 \paragraph{Leaf Nodes} They are the lowest level in the tree structure. They store a 3D cubed grid of side length $2^{\log_{2} D}$ (i.e. only powers of 2). A leaf value in the grid can be a voxel's data, other associated data for empty values (such as SDF information), or an empty value.
@@ -51,7 +51,7 @@ fn global_to_node(global: GlobalCoordinates) -> GlobalCoordinates {
 }
 \end{lstlisting}
 
-Similarly, to get the relative coordinates of a global point within the node, are precisely the \texttt{TOTAL\_LOG2\_D} least significant bits.
+Similarly, to get the relative coordinates of a global point within the node, are precisely the \linebreak \texttt{TOTAL\_LOG2\_D} least significant bits.
 
 \begin{lstlisting}[language=rust]
 /// Give local coordinates relative to the Node containing `global` position
@@ -196,8 +196,8 @@ This section covers the part of the implementation that reads VDB files and stor
 
 Unfortunately, no official documentation of the format used to encode \verb| exists.vdb| files.
 The only ``official'' resource available is the OpenVDB codebase\supercite{openvdb:doc}.
-This article\supercite{vdbfile} reviews a file format reversed engineered from the OpenVDB codebase and the bytecode of \verb|.vdb| files.
-The implementation uses this latter, reversed engineered format, which only supports \verb|.vdb| from version 218 onwards.
+This article\supercite{vdbfile} reviews a file format reverse engineered from the OpenVDB codebase and the bytecode of \verb|.vdb| files.
+The implementation uses this latter, reverse engineered format, which only supports \verb|.vdb| from version 218 onwards.
 
 The following is an overview of the contents of a \verb|.vdb| file, as described in \cite{vdbfile}.
 
@@ -206,7 +206,7 @@ The following is an overview of the contents of a \verb|.vdb| file, as described
 \begin{enumerate}
   \item Header
         \begin{enumerate}
-          \item Magic number spelling out `` BDV'' (8 bytes)
+          \item Magic number spelling out `` BDV'', including the space character (8 bytes)
           \item File version (u32)
           \item Library major and minor versions (2 u32s)
           \item Grid offsets to follow flag (u8)
@@ -264,7 +264,7 @@ The \texttt{VdbReader} is structured to sequentially process sections of the VDB
 \texttt{VdbReader} reads from the VDB file according to the grid descriptors, constructing nodes from the data, ensuring each node is placed within the VDB hierarchy. This process involves interpreting the file's byte stream according to the VDB format specifications and converting this data into a usable form within the rendering engine.
 
 \begin{lstlisting}[language=rust, captionpos=b, caption={
-    \texttt{VdbReader} definition: \texttt{reader} is file stream handler, \texttt{grid\_descriptors} hold the metadata given in \cref{file:meta}.
+    \texttt{VdbReader} definition: \texttt{reader} is the file stream handler, \texttt{grid\_descriptors} hold the metadata given in \cref{file:meta}.
     \texttt{VdbReader} implementation: The method \texttt{read\_vdb\_grid} is shown, which is called after the file header is handled, and returns a VDB if the file contents match the expectations from the header; if not, it returns an error.
   }, label={vdb:read}]
 pub struct VdbReader<R: Read + Seek> {
@@ -406,17 +406,12 @@ impl NodeAtlas {
     [self.size5, self.size4, self.size3].map(|[w, h, d]| {
       device.create_texture(&wgpu::TextureDescriptor {
         size: wgpu::Extent3d {
-          width: w,
-          height: h,
-          depth_or_array_layers: d,
+          width: w, height: h, depth_or_array_layers: d,
         },
-        mip_level_count: 1,
-        sample_count: 1,
         dimension: wgpu::TextureDimension::D3,
         format: wgpu::TextureFormat::R32Uint,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        label: Some("Atlas Texture"),
-        view_formats: &[],
+        ...
       })
     })
   }
@@ -456,11 +451,11 @@ var node3s: texture_3d<u32>;
 
 \begin{lstlisting}[language=rust, captionpos=b, caption={wgsl transformation from index of node to coordinate in atlas},label={atlas2idx}]
 fn atlas_origin_from_idx(idx: u32, dim: u32) -> vec3<u32> {
-  return vec3(idx \% dim, (idx / dim) \% dim, idx / (dim * dim));
+  return vec3(idx % dim, (idx / dim) % dim, idx / (dim * dim));
 }
 \end{lstlisting}
 
-The two types of VDB were covered: GPU and CPU-based. To convert from the CPU-based structure to the GPU-based structure one simply recursively descends the tree in deaoth-first order, adding nodes to their corresponding atlases one by one, stacking them in the 3D texture.
+The two types of VDB were covered: GPU and CPU-based. To convert from the CPU-based structure to the GPU-based structure one simply recursively descends the tree in depth-first order, adding nodes to their corresponding atlases one by one, stacking them in the 3D texture.
 \end{enumerate}
 
 \subsection{SDF for VDB}\label{vdb:sdf}
@@ -483,8 +478,3 @@ This algorithm has a straightforward 3D generalisation, starting at the top-left
 
 This algorithm can be optimised by considering that for hierarchical data structures, SDF data is virtually independent between levels of the hierarchy.
 This level of independence allows the computation to be run on a separate thread for each layer in the hierarchy.
-
-%%% Local Variables:
-%%% mode: latex
-%%% TeX-master: "../main"
-%%% End:

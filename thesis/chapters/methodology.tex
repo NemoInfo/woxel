@@ -35,7 +35,7 @@ These technical choices form the foundation for building the voxel rendering eng
 \begin{figure}[H]
   \centering
   \includesvg[width=0.8\linewidth]{architecture}
-  \caption{Data flow from \texttt{.vdb} object file to rendering an image on the screen}.
+  \caption[Engine architecture]{Data flow from \texttt{.vdb} object file to rendering an image on the screen, dotted lines represent functionality handled by the \texttt{winit} crate.}
 \end{figure}
 
 The engine's operation centres around an event-driven main loop that blocks the main thread.
@@ -44,7 +44,7 @@ This loop processes various events, ranging from keyboard inputs to redraw reque
 \begin{figure}[H]
   \centering
   \includesvg[width=0.8\linewidth]{engine_1}
-  \caption{Engine event-loop diagram. Dotted arrows are implemented in \texttt{winit} crate. Black lines represent the flow of events. The arrow line represents the main render function called on the GPU context on the scene for the window.}
+  \caption[Egine event loop]{Engine event-loop diagram. Dotted arrows are implemented by the \texttt{winit} crate. Black lines represent the flow of events. The orange arrow represents the the GPU context's render function called on the scene, for the window.}
 \end{figure}
 
 
@@ -53,8 +53,8 @@ This loop processes various events, ranging from keyboard inputs to redraw reque
 \begin{samepage}
 At the engine's core sits \texttt{Runtime}  structure, which manages the interaction between its main components:
 \begin{itemize}
-  \item The \texttt{Window} is a handler to the engine's graphical window. It is used in filtering \acrshort{os} events that are relevant to the engine, grabbing the cursor and another boilerplate.
-  \item The \texttt{Wgpu Context} holds the creation and application of the rendering pipeline.
+  \item The \texttt{Window} is a handler to the engine's graphical window. It is used in filtering \acrshort{os} events that are relevant to the engine, grabbing the cursor and other boilerplate.
+  \item The \texttt{Wgpu Context} handles the creation and application of the rendering pipeline.
   \item The \texttt{Scene} contains information about the camera, environment and a container voxel data structure.
 \end{itemize}
 \end{samepage}
@@ -112,7 +112,7 @@ This section covers the camera and state implementation, and the model will be c
     \item \emph{Field of View (FOV):} An angle representing the range that is in view. It refers to the implementation's FOV on the $Y$ (vertical) axis.\label{fov:def}
     \item \emph{Aspect ratio:} The ratio between the width and height of the viewport. It ensures that the rendered scene maintains the correct proportions.
 \end{enumerate}
-The eye and target are updated when moving the camera through a \verb|CameraController| struct that handles keyboard and mouse input. The FOV and aspect ratio are set based on the window proportions to avoid distortion. The way in which this camera information is used will be detailed in the primitives section \cref{gputypes}, where we dive into what information is actually sent to the GPU in compute shaders.
+The eye and target are updated when moving the camera through a \verb|CameraController| struct that handles keyboard and mouse input. The FOV and aspect ratio are set based on the window proportions to avoid distortion. The way in which this camera information is used will be detailed in \cref{gputypes}, which covers what information is actually sent to the GPU in compute shaders.
 
 
 \subsection{WgpuContext}
@@ -120,7 +120,7 @@ The \verb|WgpuContext| structure is the backbone of the rendering pipeline in th
 
 Broadly, \verb|WgpuContext| has the following responsibilities:
 \begin{enumerate}
-  \item \emph{Initialization:} The constructor sets up the wgpu instance, device, queue, and surface.
+  \item \emph{Initialisation:} The constructor sets up the wgpu instance, device, queue, and surface.
         It also configures the surface with the desired format and dimensions, preparing the context for rendering.
   \item \emph{Resource Setup:} The constructor prepares various resources such as textures for the atlas representation of VDB data, uniform buffers for rendering state, and bind groups for shader inputs.
         It also dynamically reads VDB files, processes the data, and updates GPU resources accordingly.
@@ -257,7 +257,7 @@ This section explains the role of the three shader stages in the implementation.
   \begin{figure}[H]
     \centering
     \includegraphics[width=1.2\linewidth]{compute_shaders}
-    \caption{Compute shader worker casting a camera ray through a pixel. Workgroups of size $8\times4\times1$ have split up the screen.}
+    \caption[Compute shader visualization]{Compute shader worker casting a camera ray through a pixel. Workgroups of size $8\times4\times1$ have split up the screen.}
   \end{figure}
 \end{multicols}
 \paragraph{Vertex Shaders} follow Compute Shaders in the graphics pipeline. Their main role is to define the vertices of a screen-sized rectangle, which serves as the canvas for overlaying the texture computed in the Compute Shader stage.
@@ -266,13 +266,13 @@ This section explains the role of the three shader stages in the implementation.
   \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\linewidth]{vertex_shaders}
-    \caption{Vertex shader creating the output surface}
+    \caption[Vertex shader visualization]{Vertex shader creating the output surface}
   \end{figure}
 
   \begin{figure}[H]
     \centering
     \includegraphics[width=0.81\linewidth]{fragment_shaders}
-    \caption{Fragment shader rasterizing the compute shader texture onto the output surface}
+    \caption[Fragment shader visualization]{Fragment shader rasterizing the compute shader texture onto the output surface}
   \end{figure}
 \end{multicols}
 
@@ -304,9 +304,10 @@ The engine includes an integrated screen recorder designed to efficiently captur
 \begin{figure}[H]
   \centering
   \includesvg[width=0.6\linewidth]{recording}
-  \caption{Producer-Consumer pattern of screen recording implementation}
+  \caption[Recording thread diagram]{Producer-Consumer pattern of screen recording implementation}
 \end{figure}
 
 This process's key aspect is ensuring that texture transfer and video encoding are handled asynchronously on a separate thread. This is done using a Producer-Consumer pattern, where the main thread acts as the producer. It periodically places frames into a blocking queue. From this queue, an encoding thread, acting as the consumer, retrieves and processes the frames, encoding them into PNG format and feeding them into \verb|ffmpeg|, a video encoding utility. This approach ensures background processing, minimizing the impact on the engine's performance.
 
 \input{chapters/vdb.tex}
+\input{chapters/ray.tex}

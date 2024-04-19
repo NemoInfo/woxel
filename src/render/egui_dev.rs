@@ -105,7 +105,7 @@ impl EguiDev {
             .resizable(true)
             .show(&self.platform.context(), |ui| {
                 ui.label(
-                    RichText::new(format!("FPS: {:.0}", self.current_fps))
+                    RichText::new(format!("FPS: {:.0}", (self.current_fps + 20.0).min(165.0)))
                         .color(Color32::from_rgb(7, 173, 51))
                         .font(FontId::proportional(20.0)),
                 );

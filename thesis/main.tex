@@ -67,12 +67,15 @@
 \uomtoc
 % other lists are not required, but can include \uomlof and \uomlot if really want to
 
+\uomlof
+
+\uomlot
 
 %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
 \begin{abstract} % put abstract here. Limit is 1 page.
-  This is abstract text.
+Rendering engines are critical in computer graphics, serving as the backbone of visualisation for digital media, including video games, simulations, virtual reality, and animated films. These engines are responsible for converting 3D models, textures, and lighting information into the compelling images users see on their screens. A rendering engine's efficiency and capabilities directly influence the digital experience's realism and interactivity.
 
-  \lipsum[1-2]
+This thesis explores the development and implementation of a ray-traced voxel rendering engine utilising sparse grids to enhance real-time rendering capabilities. The focus is on leveraging sparse data structures to manage volumetric data efficiently, thus allowing for intricate rendering details and high performance. The research investigates various techniques in ray tracing to optimise the rendering process. The outcomes demonstrate that sparse voxel grids combined with discrete signed distance fields can significantly reduce memory usage while maintaining rendering speed. This work contributes to computer graphics and game development by providing insights into the application of sparse data structures in real-time rendering environments.
 \end{abstract}%
 \clearpage
 
@@ -82,15 +85,13 @@
 
 
 \begin{uomacknowledgements}
-  Thanks!
+  I would like to express my gratitude to my supervisor, Prof. Steve Pettifer, for his guidance, encouragement, and expertise throughout this research project. My thanks also go to my partner Diana, whose support and understanding have been my anchor in my academic pursuits. I also extend my deepest appreciation to my parents, whose love and belief in my potential have been my constant motivation.
 \end{uomacknowledgements}
 
 %%%%%%%%%%%%%%%%%% CONTENT %%%%%%%%%%%%%%%%%%
 \include{chapters/intro.tex}
 \include{chapters/background.tex}
 \include{chapters/methodology.tex}
-%\include{chapters/vdb.tex}
-\include{chapters/ray.tex}
 \include{chapters/results.tex}
 \include{chapters/conclusion.tex}
 
@@ -101,14 +102,5 @@
 %%%%%%%%%%%%%%%%%% ACRONYMS %%%%%%%%%%%%%%%%%%
 \newpage
 \printglossary[type=\acronymtype]
-
-%%%%%%%%%%%%%%%%%% APPENDICES %%%%%%%%%%%%%%%%%%
-\begin{uomappendix}
-    \section{Project outline}
-    Project outline as submitted at the start of the project is a required appendix.
-
-    \section{Risk assessment}
-    Risk assessment is a required appendix. Put here. And there as well
-\end{uomappendix}
 
 \end{document}

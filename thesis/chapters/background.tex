@@ -8,7 +8,7 @@
 Graphics engines are the core software components responsible for rendering visual content in applications ranging from video games to scientific simulations and movie visual effects.
 Engines abstract the complexities of rendering by providing developers with high-level tools and interfaces to represent digital environments.
 
-Rendering engines have evolved from the simple wire-frame models of the 1960s to today's complex 3D systems, driven by advancements in computational power and graphical standards\cite{old} like OpenGL introduced in the early 1990s.
+Rendering engines have evolved from the simple wire-frame models of the 1960s to today's complex 3D systems, driven by advancements in computational power and graphical standards\supercite{old} like OpenGL introduced in the early 1990s.
 
 \subsection{Primitves}
 At the heart of any graphical engine is the concept of primitives, the simplest forms of graphical objects that the engine can process and render. Primitives are building blocks from which more complex shapes and scenes can be constructed.
@@ -21,7 +21,7 @@ This characteristic makes voxels particularly well-suited for rendering scenes w
 \subsection{Ray-tracing vs. Rasterization}
 Rendering engines can utilise two main rendering techniques for rendering scenes: ray tracing and rasterisation. Both have advantages and trade-offs.
 
-\textbf{Rasterization} is the most widespread technique used in real-time applications.
+\textbf{Rasterisation} is the most widespread technique used in real-time applications.
 It converts the 3D scene into a 2D image by projecting vertices onto the screen, filling in pixels that makeup polygons, and applying textures and lighting.
 Over the development of the graphics programming industry, graphics hardware has become extremely efficient at performing rasterisation, making it the standard for video games and interactive applications.
 
@@ -53,11 +53,11 @@ Nonetheless, the benefits of hierarchical representations often outweigh these d
 
 Donald Meagher introduced the concept of octrees in 1980\supercite{donald} as a means to manage spatial data in 3D computer graphics efficiently. This technique quickly became integral in applications like 3D rendering and geometric modelling, where it revolutionized spatial data optimization by balancing detailed representation with computational efficiency.
 
-\subsection{VDB}
+\subsection{Volumetric Dynamic B+tree}
 \newacronym{bpt}{B+tree}{A m-ary tree with a variable but often large number of children per node.}
 \newacronym{vdb}{VDB}{Volumetric Dynamic B+tree grid data structure introduced by Ken Museth\supercite{vdb2013}}
 
-\textbf{\acrshort{vdb}} was introduced in 2013 by Ken Museth\supercite{vdb2013} from the DreamWorks Animation team.
+Volumetric Dynamic B+tree or \textbf{\acrshort{vdb}} was introduced in 2013 by Ken Museth\supercite{vdb2013} from the DreamWorks Animation team.
 \begin{quote}
 It is a Volumetric, Dynamic grid that shares several characteristics with B+trees.
 It exploits spatial coherency of time-varying data to separately and compactly encode data values and grid topology.
@@ -82,14 +82,14 @@ To render a scene using ray tracing, camera rays are shot through the view frust
 This section delves into integrating ray tracing within the graphics pipeline and the methods used to implement it, focusing on casting a ray through a scene.
 
 \subsection{Graphics pipeline}
-The graphics pipeline of a rendering engine is the underlying system of a rendering engine that transforms a 3D scene into a 2D representation that is then presented on a screen. While rasterization transforms 3D objects into 2D images through a series of stages(vertex processing, shape assembly, geometry shading, rasterization, and fragment processing), the ray tracing pipelines introduce a paradigm shift. It primarily involves calculating the path of rays from the eye (camera) through pixels in an image plane and into the scene, potentially bouncing off surfaces or passing through transparent materials before contributing to the colour of a pixel.
+The graphics pipeline of a rendering engine is the underlying system of a rendering engine that transforms a 3D scene into a 2D representation that is then presented on a screen. While rasterization transforms 3D objects into 2D images through a series of stages (vertex processing, shape assembly, geometry shading, rasterization, and fragment processing), the ray tracing pipelines introduce a paradigm shift. It primarily involves calculating the path of rays from the eye (camera) through pixels in an image plane and into the scene, potentially bouncing off surfaces or passing through transparent materials before contributing to the colour of a pixel.
 
 Calculating a ray's path is central to ray tracing, so the performance of the algorithm that does this calculation is critical.
 \subsection{Casting a ray}
 Ray casting techniques vary depending on the representation of the 3D world within the rendering engine.
 This section introduces basic ray casting techniques, while subsequent discussions cover methods specific to voxel-based environments.
 
-\vspace{0.5cm}
+\newpage
 \textbf{Ray marching}
 
 A straightforward way to represent a 3D environment would be a mathematical function of sorts.
@@ -104,7 +104,6 @@ Considering the need to process millions of pixels per frame within the time con
 
 These constraints require exploring more advanced techniques to meet the goal of visual realism and performance.
 
-\vspace{0.5cm}
 \textbf{Ray casting}
 
 A 3D environment could also be represented as a collection of polygons that form meshes.
@@ -116,10 +115,10 @@ The fundamental issue with this approach is that rays must be checked for an int
 
 \vspace{0.5cm}
 \phantomsection\label{def:sdf}
-\textbf{SDF}
+\textbf{Signed Distance Fields}
 \newacronym{sdf}{SDF}{Signed distance fields, described in \cref{def:sdf}}
 
-Signed distance fields (\acrshort{sdf}) are a different way of representing the environment. An SDF provides the minimum distance from a point in space to the closest surface, allowing the ray marching algorithm to skip empty space and efficiently determine surface intersections.
+Signed distance fields (\acrshort{sdf}) are a different way of representing the environment. A SDF provides the minimum distance from a point in space to the closest surface, allowing the ray marching algorithm to skip empty space and efficiently determine surface intersections.
 With the distance to the nearest surface known, ray marching can be performed by stepping along the ray with that distance, drastically reducing the number of steps needed to cast a ray.
 
 Combining SDF with ray marching offers a powerful method for rendering complex scenes, including soft shadows, ambient occlusion, and volumetric effects.
@@ -134,7 +133,7 @@ The ray casting methods presented so far do not take advantage of the discrete v
 
 \vspace{0.5cm}
 \phantomsection\label{def:dda}
-\textbf{DDA}
+\textbf{Digital Differential Analyzer}
 \newacronym{dda}{DDA}{Digital Differential Analyzer, line drawing algorithm described in \cref{def:dda}}
 
 Basic ray marching can be improved on a discrete voxel grid by stepping from voxel to voxel. Because voxels are the smallest unit of space, a ray can safely step from one to the next, ensuring there is nothing else in between.
@@ -147,7 +146,7 @@ At each iteration, it steps to the closest grid intersection along the ray.
 \vspace{0.5cm}
 \phantomsection\label{def:hdda}
 \newacronym{hdda}{HDDA}{Hierarchical \acrshort{dda}, line drawing algorithm described in \cref{def:hdda}}
-\textbf{HDDA}
+\textbf{Hierarchical  Digital Differential Analyzer}
 
 On a hierarchical grid, the DDA algorithm can take advantage of the data structure's topology by stepping through empty, larger chunks.
 A ray cast using \acrshort{hdda} essentially performs DDA at the level in the tree it is currently at.
@@ -163,7 +162,7 @@ This algorithm can be highly efficient; large empty areas can be skipped in a si
 ''
 \end{quote}
 
-This voxel rendering engine is made on the same backend as this project, Rust and wgpu. However, it employs a more standard approach to rendering, generating triangle meshes from voxel data and performing rasterization.
+This is the original library developed by the authors of the VDB paper. It is very well integrated with a range of rendering engines, such as Blender, Maya, and Houdini. OpenVDB is more of a library to interact with the VDB data structure than a rendering engine. It implements highly optimized algorithms for VDB data (e.g., CUDA HDDA).
 
 \subsection{All is Cubes\supercite{cubes}}
 
@@ -175,3 +174,8 @@ This is a voxel rendering engine made on the same backend as this project, Rust 
 
 \subsection{ Unique Contribution of this Project}
 To the best of my knowledge, there is currently no fully operational voxel rendering engine built solely on the VDB data structure. This project aims to fill that gap by developing a comprehensive rendering engine based entirely on VDB, leveraging its capabilities to efficiently handle complex and detailed volumetric data. Unlike other systems, which may integrate VDB as one of many components or use it for specific functions, this engine is designed to utilize VDB as the core framework for all rendering tasks. This distinction sets the project apart, offering a new perspective and opportunities to explore novel ray-tracing techniques.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End:
