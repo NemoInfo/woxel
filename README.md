@@ -9,7 +9,12 @@
 Web compatible voxel rendering engine. <br/>
 The engine uses the VDB345[^1] data structure. It then performs a custom DDA based on the HDDA[^3] paper, combined with a grid SDF, in compute shaders, to render the model.
 
-![](photos/woxel_dragon.png) 
+![](thesis/figures/bunny_g.png) 
+
+## Explanation
+This project was developed as part of my university dissertation. For an in depth explination take a look at the: <br/>
+- [Thesis](thesis/main.pdf) which covers the whole project in detail.
+- Youtube [video](https://www.youtube.com/watch?v=ydc0edDHCF0&ab_channel=AaronTeodorPanaitescu) which explains the VDB data structure and some raycasting algorithms.
 
 ## Instalation
 To run the project you will need the Rust nightly toolchain `1.75.0-nightly`[^2].
@@ -31,8 +36,29 @@ You can load any `.vdb` model into the engine by adding it to the `assets/` fold
 Then, on the dev pannel just select it from the dropdown menu. 
 
 ## Screenshots
-![](photos/woxel_space_ray.png)
-![](photos/woxel_space.png)
+<table>
+  <tr>
+    <td style="width: 50%;"><img src="thesis/figures/arm_1.png" style="width: 100%;"/></td>
+    <td style="width: 50%;"><img src="thesis/figures/dragon_d.png" style="width: 100%;"/></td>
+  </tr>
+  <tr>
+    <td style="width: 50%;"><img src="thesis/figures/iss_g.png" style="width: 100%;"/></td>
+    <td style="width: 50%;"><img src="thesis/figures/astro_1.png" style="width: 100%;"/></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <td style="width: 50%;"><img src="thesis/figures/gui_1.png" style="width: 100%;"/></td>
+    <td style="width: 50%;"><img src="thesis/figures/dragon_3.png" style="width: 100%;"/></td>
+  </tr>
+  <tr>
+    <td style="width: 50%;"><img src="photos/woxel_space_ray.png" style="width: 100%;"/></td>
+    <td style="width: 50%;"><img src="thesis/figures/iss_rgb.png" style="width: 100%;"/></td>
+  </tr>
+</table>
+
+
+
 
 
 [^1]: [Ken Museth. 2013. VDB: High-resolution sparse volumes with dynamic topology](https://www.museth.org/Ken/Publications_files/Museth_TOG13.pdf)
